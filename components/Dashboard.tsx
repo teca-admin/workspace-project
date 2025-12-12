@@ -14,17 +14,17 @@ const data: ChartDataPoint[] = [
 ];
 
 const StatCard: React.FC<{ title: string; value: string; icon: any; change: string }> = ({ title, value, icon: Icon, change }) => (
-  <div className="bg-[#0a0c10] border border-[#30403E]/40 p-5 rounded-lg hover:border-[#30403E]/80 transition-colors duration-300 group">
+  <div className="bg-workspace-surface border border-workspace-border p-5 rounded-lg hover:border-workspace-accent transition-colors duration-300 group shadow-sm">
     <div className="flex justify-between items-start mb-4">
-      <div className="p-1.5 rounded-md text-gray-500 group-hover:text-gray-300 transition-colors">
+      <div className="p-1.5 rounded-md text-workspace-muted group-hover:text-workspace-text transition-colors">
         <Icon className="w-5 h-5 stroke-[1.5]" />
       </div>
-      <span className="text-[10px] font-medium text-[#4d6663] border border-[#30403E]/30 px-2 py-0.5 rounded-full">
+      <span className="text-[10px] font-medium text-workspace-accent border border-workspace-border px-2 py-0.5 rounded-full">
         {change}
       </span>
     </div>
-    <h3 className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-1">{title}</h3>
-    <p className="text-xl font-light text-gray-200 tracking-tight">{value}</p>
+    <h3 className="text-workspace-muted text-xs font-medium uppercase tracking-wider mb-1">{title}</h3>
+    <p className="text-xl font-light text-workspace-text tracking-tight">{value}</p>
   </div>
 );
 
@@ -32,8 +32,8 @@ const Dashboard: React.FC = () => {
   return (
     <div className="p-10 space-y-10 animate-fade-in max-w-7xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-light text-gray-100 tracking-tight">Painel de Controle</h1>
-        <p className="text-sm text-gray-500 font-light">Visão geral e métricas de desempenho.</p>
+        <h1 className="text-2xl font-light text-workspace-text tracking-tight">Painel de Controle</h1>
+        <p className="text-sm text-workspace-muted font-light">Visão geral e métricas de desempenho.</p>
       </div>
 
       {/* Stats Grid */}
@@ -45,12 +45,12 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Chart Section */}
-      <div className="bg-[#0a0c10] border border-[#30403E]/40 rounded-lg p-6 h-96">
+      <div className="bg-workspace-surface border border-workspace-border rounded-lg p-6 h-96 shadow-sm">
         <div className="flex items-center justify-between mb-8">
-           <h2 className="text-sm font-medium text-gray-300 uppercase tracking-wider">Produtividade Semanal</h2>
+           <h2 className="text-sm font-medium text-workspace-text uppercase tracking-wider">Produtividade Semanal</h2>
            <div className="flex gap-2">
-             <div className="w-2 h-2 rounded-full bg-[#30403E]"></div>
-             <span className="text-xs text-gray-500">Métrica Principal</span>
+             <div className="w-2 h-2 rounded-full bg-workspace-accent"></div>
+             <span className="text-xs text-workspace-muted">Métrica Principal</span>
            </div>
         </div>
         
@@ -59,32 +59,38 @@ const Dashboard: React.FC = () => {
             <AreaChart data={data}>
               <defs>
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#30403E" stopOpacity={0.5}/>
-                  <stop offset="95%" stopColor="#30403E" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#30403E" vertical={false} opacity={0.2} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} opacity={0.4} />
               <XAxis 
                 dataKey="name" 
                 axisLine={false} 
                 tickLine={false} 
-                tick={{ fill: '#4b5563', fontSize: 10, fontFamily: 'Inter' }} 
+                tick={{ fill: 'var(--text-muted)', fontSize: 10, fontFamily: 'Inter' }} 
                 dy={10}
               />
               <YAxis 
                 axisLine={false} 
                 tickLine={false} 
-                tick={{ fill: '#4b5563', fontSize: 10, fontFamily: 'Inter' }} 
+                tick={{ fill: 'var(--text-muted)', fontSize: 10, fontFamily: 'Inter' }} 
               />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#000208', borderColor: '#30403E', borderRadius: '4px', fontSize: '12px' }}
-                itemStyle={{ color: '#d1d5db' }}
-                cursor={{ stroke: '#30403E', strokeWidth: 1 }}
+                contentStyle={{ 
+                  backgroundColor: 'var(--bg-surface)', 
+                  borderColor: 'var(--border-color)', 
+                  borderRadius: '4px', 
+                  fontSize: '12px',
+                  color: 'var(--text-main)'
+                }}
+                itemStyle={{ color: 'var(--text-main)' }}
+                cursor={{ stroke: 'var(--border-color)', strokeWidth: 1 }}
               />
               <Area 
                 type="monotone" 
                 dataKey="value" 
-                stroke="#4d6663" 
+                stroke="var(--accent)" 
                 fillOpacity={1} 
                 fill="url(#colorValue)" 
                 strokeWidth={1.5}

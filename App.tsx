@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Home from './components/Home';
@@ -7,11 +7,11 @@ import { View } from './types';
 import { Briefcase, CheckSquare, Library } from 'lucide-react';
 
 const PlaceholderView: React.FC<{ title: string; subtitle: string; icon: any }> = ({ title, subtitle, icon: Icon }) => (
-  <div className="flex flex-col items-center justify-center h-full text-gray-600 animate-fade-in">
-    <div className="p-4 border border-[#30403E]/30 rounded-lg mb-6 bg-[#0a0c10]">
-      <Icon size={32} className="text-[#30403E] stroke-[1]" />
+  <div className="flex flex-col items-center justify-center h-full text-workspace-muted animate-fade-in">
+    <div className="p-4 border border-workspace-border rounded-lg mb-6 bg-workspace-surface">
+      <Icon size={32} className="text-workspace-accent stroke-[1]" />
     </div>
-    <h2 className="text-lg font-light text-gray-300 tracking-wide mb-2 uppercase">{title}</h2>
+    <h2 className="text-lg font-light text-workspace-text tracking-wide mb-2 uppercase">{title}</h2>
     <p className="text-xs font-light tracking-wider opacity-60">{subtitle}</p>
   </div>
 );
@@ -19,6 +19,19 @@ const PlaceholderView: React.FC<{ title: string; subtitle: string; icon: any }> 
 const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentView, setCurrentView] = useState<View>(View.HOME);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+
+  // Theme Toggle Effect
+  useEffect(() => {
+    const html = document.documentElement;
+    if (isDarkMode) {
+      html.classList.add('dark');
+    } else {
+      html.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
   
   const renderContent = () => {
     switch (currentView) {
@@ -40,32 +53,34 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#000208] text-gray-300 selection:bg-[#30403E] selection:text-white">
+    <div className="flex h-screen w-full overflow-hidden bg-workspace-main text-workspace-text selection:bg-workspace-accent selection:text-white transition-colors duration-300">
       <Sidebar 
         isOpen={sidebarOpen} 
         toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
         currentView={currentView}
         setCurrentView={setCurrentView}
+        isDarkMode={isDarkMode}
+        toggleTheme={toggleTheme}
       />
       
-      <main className="flex-1 h-full overflow-hidden relative flex flex-col bg-[#000208]">
+      <main className="flex-1 h-full overflow-hidden relative flex flex-col bg-workspace-main transition-colors duration-300">
         {/* Top Header Strip - Ultra Minimal */}
-        <header className="h-14 border-b border-[#30403E]/20 flex items-center justify-between px-8 bg-[#000208] z-10 shrink-0">
-          <div className="flex items-center gap-2 text-gray-600 text-xs tracking-widest font-medium uppercase">
+        <header className="h-14 border-b border-workspace-border flex items-center justify-between px-8 bg-workspace-main z-10 shrink-0 transition-colors duration-300">
+          <div className="flex items-center gap-2 text-workspace-muted text-xs tracking-widest font-medium uppercase">
              <span>Workspace</span>
-             <span className="text-[#30403E]">/</span>
-             <span className="text-gray-400">{currentView}</span>
+             <span className="text-workspace-accent">/</span>
+             <span className="text-workspace-text/60">{currentView}</span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1 bg-[#0a0c10] border border-[#30403E]/30 rounded-full">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-900/80 animate-pulse border border-emerald-700" />
-                <span className="text-[10px] text-gray-500 font-medium tracking-wider">ONLINE</span>
+            <div className="flex items-center gap-2 px-3 py-1 bg-workspace-surface border border-workspace-border rounded-full shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                <span className="text-[10px] text-workspace-muted font-medium tracking-wider">ONLINE</span>
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto scroll-smooth p-0 bg-[#000208]">
+        <div className="flex-1 overflow-y-auto scroll-smooth p-0 bg-workspace-main transition-colors duration-300">
           {renderContent()}
         </div>
       </main>
