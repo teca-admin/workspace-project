@@ -24,6 +24,13 @@ const initialTools: Tool[] = [
     description: 'Ferramenta de design de interface e prototipagem.',
     url: 'https://www.figma.com',
     category: 'Design'
+  },
+  {
+    id: '4',
+    title: 'Auditoria Raio-X',
+    description: 'Ferramenta integrada para auditoria e análise detalhada.',
+    url: 'https://auditoria-raiox.vercel.app/',
+    category: 'Auditoria'
   }
 ];
 
