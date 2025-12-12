@@ -1,16 +1,22 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="h-full">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Workspace Minimalista</title>
+    <!-- Tailwind via CDN is kept for simplicity in this specific setup, 
+         though usually it's installed via npm in a full build -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-      body {
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
         font-family: 'Inter', sans-serif;
         background-color: #000208;
         color: #e5e7eb;
+        overflow: hidden; /* Prevent double scrollbars */
       }
       /* Custom Scrollbar for minimalist look */
       ::-webkit-scrollbar {
@@ -31,17 +37,21 @@
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
     "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "recharts": "https://esm.sh/recharts@^3.5.1"
+    "recharts": "https://esm.sh/recharts@^3.5.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "vite": "https://esm.sh/vite@^7.2.7"
   }
 }
 </script>
 </head>
   <body>
-    <div id="root"></div>
+    <div id="root" class="h-full w-full"></div>
+    <!-- Point to the local index.tsx for Vite to pick up -->
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

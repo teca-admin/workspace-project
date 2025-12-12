@@ -8,7 +8,7 @@ const initialTools: Tool[] = [
     id: '1',
     title: 'Tratamento de Dados',
     description: 'Processamento massivo de planilhas e análise de inconsistências.',
-    url: 'https://tratamento-de-dados-odwb92uhy-corpteca-s-projects.vercel.app/', 
+    url: 'https://tratamento-de-dados.vercel.app/', 
     category: 'Processos'
   },
   {
