@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, MessageSquare, Briefcase, Zap } from 'lucide-react';
+import { ArrowRight, Briefcase, Zap, Wrench } from 'lucide-react';
 import { View } from '../types';
 
 interface HomeProps {
@@ -23,19 +23,19 @@ const Home: React.FC<HomeProps> = ({ setCurrentView }) => {
       </div>
 
       {/* Quick Actions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         
-        {/* Card 1 */}
+        {/* Card 1: Ferramentas (Substituindo IA para manter layout) */}
         <button 
-          onClick={() => setCurrentView(View.CHAT)}
+          onClick={() => setCurrentView(View.TOOLS)}
           className="group flex flex-col items-start p-6 bg-[#0a0c10] border border-[#30403E]/40 rounded-lg hover:border-[#30403E] hover:bg-[#30403E]/10 transition-all duration-300"
         >
           <div className="p-3 bg-[#30403E]/20 rounded-md mb-4 group-hover:bg-[#30403E]/30 transition-colors">
-            <MessageSquare className="w-6 h-6 text-gray-300 stroke-[1.5]" />
+            <Wrench className="w-6 h-6 text-gray-300 stroke-[1.5]" />
           </div>
-          <h3 className="text-sm font-medium text-gray-200 uppercase tracking-wider mb-2">Assistente IA</h3>
+          <h3 className="text-sm font-medium text-gray-200 uppercase tracking-wider mb-2">Ferramentas</h3>
           <p className="text-xs text-gray-500 font-light leading-relaxed mb-4 text-left">
-            Inicie uma nova conversa ou continue suas tarefas com o Gemini.
+            Acesse rapidamente suas ferramentas integradas e utilitários.
           </p>
           <div className="mt-auto flex items-center text-xs text-[#4d6663] group-hover:text-white transition-colors">
             Acessar <ArrowRight className="w-3 h-3 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -61,25 +61,25 @@ const Home: React.FC<HomeProps> = ({ setCurrentView }) => {
 
         {/* Card 3 */}
         <button 
-          onClick={() => setCurrentView(View.TOOLS)}
+          onClick={() => setCurrentView(View.DASHBOARD)}
           className="group flex flex-col items-start p-6 bg-[#0a0c10] border border-[#30403E]/40 rounded-lg hover:border-[#30403E] hover:bg-[#30403E]/10 transition-all duration-300"
         >
           <div className="p-3 bg-[#30403E]/20 rounded-md mb-4 group-hover:bg-[#30403E]/30 transition-colors">
             <Zap className="w-6 h-6 text-gray-300 stroke-[1.5]" />
           </div>
-          <h3 className="text-sm font-medium text-gray-200 uppercase tracking-wider mb-2">Ações Rápidas</h3>
+          <h3 className="text-sm font-medium text-gray-200 uppercase tracking-wider mb-2">Painel</h3>
           <p className="text-xs text-gray-500 font-light leading-relaxed mb-4 text-left">
-            Acesse ferramentas e utilitários do sistema rapidamente.
+            Visualize métricas e indicadores de desempenho.
           </p>
           <div className="mt-auto flex items-center text-xs text-[#4d6663] group-hover:text-white transition-colors">
-            Explorar <ArrowRight className="w-3 h-3 ml-2 group-hover:translate-x-1 transition-transform" />
+            Visualizar <ArrowRight className="w-3 h-3 ml-2 group-hover:translate-x-1 transition-transform" />
           </div>
         </button>
       </div>
 
       {/* Status Strip */}
       <div className="mt-16 border-t border-[#30403E]/20 pt-8 flex items-center justify-between text-xs text-gray-600 font-light">
-         <span>V 1.0.0</span>
+         <span>V 1.0.1</span>
          <span>SISTEMA OPERACIONAL: ONLINE</span>
       </div>
     </div>

@@ -6,16 +6,7 @@ export enum View {
   PROJECTS = 'PROJECTS', // PROJETOS
   DEMANDS = 'DEMANDS',   // DEMANDAS
   LIBRARY = 'LIBRARY',   // BIBLIOTECA
-  DASHBOARD = 'DASHBOARD', // PAINEL
-  CHAT = 'CHAT'          // CHAT. IA
-}
-
-export interface Message {
-  id: string;
-  role: 'user' | 'model';
-  text: string;
-  timestamp: Date;
-  isError?: boolean;
+  DASHBOARD = 'DASHBOARD' // PAINEL
 }
 
 export interface NavItem {

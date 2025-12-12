@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
-import GeminiChat from './components/GeminiChat';
 import Home from './components/Home';
 import Tools from './components/Tools';
 import { View } from './types';
@@ -35,8 +34,6 @@ const App: React.FC = () => {
         return <PlaceholderView title="Biblioteca" subtitle="Repositório de arquivos vazio" icon={Library} />;
       case View.DASHBOARD:
         return <Dashboard />;
-      case View.CHAT:
-        return <GeminiChat />;
       default:
         return <Home setCurrentView={setCurrentView} />;
     }

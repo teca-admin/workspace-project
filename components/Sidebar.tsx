@@ -2,7 +2,6 @@ import React from 'react';
 import { 
   Home,
   LayoutDashboard, 
-  MessageSquare, 
   Briefcase, 
   CheckSquare, 
   Library, 
@@ -20,7 +19,7 @@ interface SidebarProps {
   setCurrentView: (view: View) => void;
 }
 
-// Order: HOME, FERRAMENTA, PROJETOS, DEMANDAS, BIBLIOTECA, PAINEL, CHAT. IA
+// Order: HOME, FERRAMENTA, PROJETOS, DEMANDAS, BIBLIOTECA, PAINEL
 const navItems: NavItem[] = [
   { id: View.HOME, label: 'HOME', icon: Home },
   { id: View.TOOLS, label: 'FERRAMENTA', icon: Wrench },
@@ -28,7 +27,6 @@ const navItems: NavItem[] = [
   { id: View.DEMANDS, label: 'DEMANDAS', icon: CheckSquare },
   { id: View.LIBRARY, label: 'BIBLIOTECA', icon: Library },
   { id: View.DASHBOARD, label: 'PAINEL', icon: LayoutDashboard },
-  { id: View.CHAT, label: 'CHAT. IA', icon: MessageSquare },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, currentView, setCurrentView }) => {
