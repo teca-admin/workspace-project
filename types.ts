@@ -23,39 +23,40 @@ export interface ChartDataPoint {
 
 export interface Tool {
   id: string;
-  titulo: string;
-  descricao: string;
+  title: string;       // Frontend: title, DB: titulo
+  description: string; // Frontend: description, DB: descricao
   url: string;
-  icone?: string;
-  categoria?: string;
-  // Novos campos para sistema de pastas
-  parentId?: string | null; 
-  isFolder?: boolean;
+  icon?: string;       // Frontend: icon, DB: icone
+  category?: string;   // Frontend: category, DB: categoria
+  parentId?: string | null; // Frontend: parentId, DB: parent_id
+  isFolder?: boolean;       // Frontend: isFolder, DB: is_folder
+  createdAt?: Date;    // Frontend: createdAt, DB: criado_em
+  updatedAt?: Date;    // Frontend: updatedAt, DB: atualizado_em
 }
 
 export interface Note {
   id: string;
-  titulo: string;
-  conteudo: string;
-  criado_em: Date;
-  atualizado_em: Date;
+  title: string;       // Frontend: title, DB: titulo
+  content: string;     // Frontend: content, DB: conteudo
+  createdAt: Date;     // Frontend: createdAt, DB: criado_em
+  updatedAt: Date;     // Frontend: updatedAt, DB: atualizado_em
 }
 
 // Interfaces para os Artefatos (Conceito de Mago/Arsenal)
 export interface ArtifactCollection {
   id: string;
-  name: string; // Ex: "Prompts", "Necromancia", "Frontend"
-  icon: string; // Identificador do ícone
-  description?: string;
+  name: string;         // Frontend: name, DB: nome
+  icon: string;         // Frontend: icon, DB: icone
+  description?: string; // Frontend: description, DB: descricao
 }
 
 export interface Artifact {
   id: string;
-  collectionId: string;
-  title: string;
-  content: string;
-  type: 'code' | 'text' | 'spell';
-  createdAt: Date;
-  icon?: string;
-  color?: string; // 'blue' | 'green' | 'amber' | 'red' | 'purple' | 'gray' etc
+  collectionId: string; // Frontend: collectionId, DB: colecao_id
+  title: string;        // Frontend: title, DB: titulo
+  content: string;      // Frontend: content, DB: conteudo
+  type: 'code' | 'text' | 'spell'; // Frontend: type, DB: tipo
+  createdAt: Date;      // Frontend: createdAt, DB: criado_em
+  icon?: string;        // Frontend: icon, DB: icone
+  color?: string;       // Frontend: color, DB: cor
 }

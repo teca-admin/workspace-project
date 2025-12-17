@@ -11,6 +11,50 @@ import {
 import { Artifact, ArtifactCollection } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
+// --- Mapeamento de Colunas (De/Para) ---
+
+// Frontend -> Supabase (Collections)
+const toSupabaseCol = (col: Partial<ArtifactCollection>) => ({
+  nome: col.name,
+  descricao: col.description,
+  icone: col.icon
+});
+
+// Supabase -> Frontend (Collections)
+const toFrontendCol = (data: any): ArtifactCollection => ({
+  id: data.id, 
+  name: data.nome, 
+  description: data.descricao, 
+  icon: data.icone
+});
+
+// Frontend -> Supabase (Artifacts)
+const toSupabaseArt = (art: Partial<Artifact>) => ({
+  colecao_id: art.collectionId,
+  titulo: art.title,
+  conteudo: art.content,
+  tipo: art.type,
+  icone: art.icon,
+  cor: art.color
+});
+
+// Supabase -> Frontend (Artifacts)
+const toFrontendArt = (data: any): Artifact => ({
+  id: data.id, 
+  collectionId: data.colecao_id, 
+  title: data.titulo, 
+  content: data.conteudo, 
+  type: data.tipo, 
+  createdAt: new Date(data.criado_em), 
+  icon: data.icone, 
+  color: data.cor
+});
+
+// Helper para formatar erro
+const formatError = (error: any) => {
+  return error?.message || JSON.stringify(error);
+};
+
 // --- Configuração de Ícones Disponíveis ---
 const ICON_MAP: Record<string, React.ElementType> = {
   'folder': Folder, 'box': Box, 'archive': Archive, 'layers': Layers, 'settings': Settings,
@@ -85,28 +129,20 @@ const Artifacts: React.FC = () => {
     try {
       // Fetch Coleções
       const { data: colData, error: colError } = await supabase.from('colecoes').select('*');
-      if (colError) console.error('Erro coleções:', colError);
+      if (colError) throw colError;
       if (colData) {
-        setCollections(colData.map((d: any) => ({
-          id: d.id, name: d.nome, description: d.descricao, icon: d.icone
-        })));
+        setCollections(colData.map(toFrontendCol));
       }
 
       // Fetch Artefatos
       const { data: artData, error: artError } = await supabase.from('artefatos').select('*');
-      if (artError) console.error('Erro artefatos:', artError);
+      if (artError) throw artError;
       if (artData) {
-        setArtifacts(artData.map((d: any) => ({
-          id: d.id, 
-          collectionId: d.colecao_id, 
-          title: d.titulo, 
-          content: d.conteudo, 
-          type: d.tipo, 
-          createdAt: new Date(d.criado_em), 
-          icon: d.icone, 
-          color: d.cor
-        })));
+        setArtifacts(artData.map(toFrontendArt));
       }
+      console.log('[SUPABASE] ✅ Artefatos sincronizados');
+    } catch (e) {
+      console.error('[SUPABASE] ❌ Erro ao sincronizar:', formatError(e));
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +152,7 @@ const Artifacts: React.FC = () => {
     fetchData();
   }, []);
 
-  // --- CRUD Coleções ---
+  // --- CRUD Coleções (Optimistic UI) ---
   const openCollectionModal = (collection?: ArtifactCollection) => {
     if (collection) {
       setEditingCollectionId(collection.id);
@@ -135,39 +171,81 @@ const Artifacts: React.FC = () => {
   const handleSaveCollection = async () => {
     if (!newColName.trim()) return;
     
-    const payload = {
-      nome: newColName,
-      descricao: newColDesc,
-      icone: newColIcon
+    const colData: Partial<ArtifactCollection> = {
+      name: newColName,
+      description: newColDesc,
+      icon: newColIcon
     };
 
     if (editingCollectionId) {
-        // Update Local
-        setCollections(c => c.map(item => item.id === editingCollectionId ? { ...item, name: payload.nome, description: payload.descricao, icon: payload.icone } : item));
-        // Update DB
-        await supabase.from('colecoes').update(payload).eq('id', editingCollectionId);
+        // UPDATE
+        // 1. Atualizar local IMEDIATAMENTE
+        setCollections(c => c.map(item => item.id === editingCollectionId ? { ...item, ...colData } as ArtifactCollection : item));
+        setIsCollectionModalOpen(false);
+
+        // 2. Enviar para Supabase
+        try {
+            const { error } = await supabase.from('colecoes').update(toSupabaseCol(colData)).eq('id', editingCollectionId);
+            if (error) throw error;
+            console.log('[SUPABASE] ✅ Coleção atualizada');
+        } catch (error) {
+            console.error('[SUPABASE] ❌ Erro:', formatError(error));
+            fetchData(); // Revert
+            alert(`Erro ao atualizar coleção: ${formatError(error)}`);
+        }
+
     } else {
+        // CREATE
+        // 1. Atualizar local IMEDIATAMENTE
         const tempId = `temp-${Date.now()}`;
-        setCollections([...collections, { id: tempId, name: payload.nome, description: payload.descricao, icon: payload.icone }]);
-        const { data } = await supabase.from('colecoes').insert([payload]).select().single();
-        if (data) {
-           setCollections(c => c.map(item => item.id === tempId ? { ...item, id: data.id } : item));
+        const newCol = { id: tempId, ...colData } as ArtifactCollection;
+        setCollections(prev => [...prev, newCol]);
+        setIsCollectionModalOpen(false);
+
+        // 2. Enviar para Supabase
+        try {
+            const { data, error } = await supabase.from('colecoes').insert([toSupabaseCol(colData)]).select().single();
+            if (error) throw error;
+            
+            // 3. Substituir
+            setCollections(c => c.map(item => item.id === tempId ? toFrontendCol(data) : item));
+            console.log('[SUPABASE] ✅ Coleção criada');
+        } catch (error) {
+            console.error('[SUPABASE] ❌ Erro:', formatError(error));
+            setCollections(prev => prev.filter(c => c.id !== tempId)); // Revert
+            alert(`Erro ao criar coleção: ${formatError(error)}`);
         }
     }
-    setIsCollectionModalOpen(false);
   };
 
   const handleDeleteCollection = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (window.confirm("Excluir esta coleção e todos os seus itens?")) {
-        setCollections(collections.filter(c => c.id !== id));
-        setArtifacts(artifacts.filter(a => a.collectionId !== id));
-        if (selectedCollectionId === id) { setSelectedCollectionId(null); setSelectedArtifactId(null); }
-        await supabase.from('colecoes').delete().eq('id', id);
+    if (!window.confirm("Excluir esta coleção e todos os seus itens?")) return;
+
+    // 1. Guardar para restaurar
+    const colRemoved = collections.find(c => c.id === id);
+    const artsRemoved = artifacts.filter(a => a.collectionId === id);
+
+    // 2. Remover local IMEDIATAMENTE
+    setCollections(collections.filter(c => c.id !== id));
+    setArtifacts(artifacts.filter(a => a.collectionId !== id));
+    if (selectedCollectionId === id) { setSelectedCollectionId(null); setSelectedArtifactId(null); }
+
+    // 3. Enviar para Supabase
+    try {
+        const { error } = await supabase.from('colecoes').delete().eq('id', id);
+        if (error) throw error;
+        console.log('[SUPABASE] ✅ Coleção excluída');
+    } catch (error) {
+        console.error('[SUPABASE] ❌ Erro:', formatError(error));
+        // Restore
+        if (colRemoved) setCollections(prev => [...prev, colRemoved]);
+        if (artsRemoved.length) setArtifacts(prev => [...prev, ...artsRemoved]);
+        alert(`Erro ao excluir: ${formatError(error)}`);
     }
   };
 
-  // --- CRUD Artefatos ---
+  // --- CRUD Artefatos (Optimistic UI) ---
   const openArtifactModal = (artifact?: Artifact) => {
     if (artifact) {
       setEditingArtifactId(artifact.id);
@@ -182,47 +260,83 @@ const Artifacts: React.FC = () => {
   const handleSaveArtifact = async () => {
     if (!artifactForm.title.trim() || !selectedCollectionId) return;
 
-    const payload = {
-      colecao_id: selectedCollectionId,
-      titulo: artifactForm.title,
-      conteudo: artifactForm.content,
-      tipo: artifactForm.type,
-      icone: artifactForm.icon,
-      cor: artifactForm.color
+    const artData: Partial<Artifact> = {
+      collectionId: selectedCollectionId,
+      title: artifactForm.title,
+      content: artifactForm.content,
+      type: artifactForm.type,
+      icon: artifactForm.icon,
+      color: artifactForm.color
     };
 
     if (editingArtifactId) {
-      setArtifacts(a => a.map(item => item.id === editingArtifactId ? { ...item, ...artifactForm } : item));
-      await supabase.from('artefatos').update(payload).eq('id', editingArtifactId);
+      // UPDATE
+      // 1. Atualizar local
+      setArtifacts(a => a.map(item => item.id === editingArtifactId ? { ...item, ...artData } as Artifact : item));
+      setIsArtifactModalOpen(false);
+
+      // 2. Enviar para Supabase
+      try {
+          const { error } = await supabase.from('artefatos').update(toSupabaseArt(artData)).eq('id', editingArtifactId);
+          if (error) throw error;
+          console.log('[SUPABASE] ✅ Artefato atualizado');
+      } catch (error) {
+          console.error('[SUPABASE] ❌ Erro:', formatError(error));
+          fetchData(); // Revert
+          alert(`Erro ao atualizar artefato: ${formatError(error)}`);
+      }
     } else {
+      // CREATE
+      // 1. Atualizar local
       const tempId = `temp-${Date.now()}`;
-      const newArtifact: Artifact = {
+      const newArtifact = {
         id: tempId,
-        collectionId: selectedCollectionId,
-        title: artifactForm.title,
-        content: artifactForm.content,
-        type: artifactForm.type,
         createdAt: new Date(),
-        icon: artifactForm.icon,
-        color: artifactForm.color
-      };
-      setArtifacts([...artifacts, newArtifact]);
+        ...artData
+      } as Artifact;
+
+      setArtifacts(prev => [...prev, newArtifact]);
       setSelectedArtifactId(tempId);
+      setIsArtifactModalOpen(false);
       
-      const { data } = await supabase.from('artefatos').insert([payload]).select().single();
-      if (data) {
-        setArtifacts(a => a.map(item => item.id === tempId ? { ...item, id: data.id, createdAt: new Date(data.criado_em) } : item));
-        setSelectedArtifactId(data.id);
+      // 2. Enviar para Supabase
+      try {
+          const { data, error } = await supabase.from('artefatos').insert([toSupabaseArt(artData)]).select().single();
+          if (error) throw error;
+
+          // 3. Substituir
+          setArtifacts(a => a.map(item => item.id === tempId ? toFrontendArt(data) : item));
+          setSelectedArtifactId(data.id);
+          console.log('[SUPABASE] ✅ Artefato criado');
+      } catch (error) {
+          console.error('[SUPABASE] ❌ Erro:', formatError(error));
+          setArtifacts(prev => prev.filter(a => a.id !== tempId)); // Revert
+          if (selectedArtifactId === tempId) setSelectedArtifactId(null);
+          alert(`Erro ao criar artefato: ${formatError(error)}`);
       }
     }
-    setIsArtifactModalOpen(false);
   };
 
   const handleDeleteArtifact = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
+    
+    // 1. Guardar para restaurar
+    const itemRemoved = artifacts.find(a => a.id === id);
+
+    // 2. Remover local
     if (selectedArtifactId === id) setSelectedArtifactId(null);
     setArtifacts(artifacts.filter(a => a.id !== id));
-    await supabase.from('artefatos').delete().eq('id', id);
+    
+    // 3. Enviar para Supabase
+    try {
+        const { error } = await supabase.from('artefatos').delete().eq('id', id);
+        if (error) throw error;
+        console.log('[SUPABASE] ✅ Artefato excluído');
+    } catch (error) {
+        console.error('[SUPABASE] ❌ Erro:', formatError(error));
+        if (itemRemoved) setArtifacts(prev => [...prev, itemRemoved]);
+        alert(`Erro ao excluir: ${formatError(error)}`);
+    }
   };
 
   return (

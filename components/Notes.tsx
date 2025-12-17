@@ -23,6 +23,46 @@ import {
 import { Note } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
+// --- Mapeamento de Colunas (De/Para) ---
+
+// Frontend -> Supabase
+const toSupabase = (note: Partial<Note>) => {
+  return {
+    titulo: note.title,
+    conteudo: note.content,
+  };
+};
+
+// Supabase -> Frontend
+const toFrontend = (data: any): Note => ({
+  id: data.id,
+  title: data.titulo || 'Sem Título',
+  content: data.conteudo || '',
+  createdAt: new Date(data.criado_em),
+  updatedAt: new Date(data.atualizado_em)
+});
+
+// Helper para formatar erro
+const formatError = (error: any) => {
+  return error?.message || JSON.stringify(error);
+};
+
+interface ToolButtonProps {
+  icon: React.ElementType;
+  onClick: () => void;
+  label: string;
+}
+
+const ToolButton: React.FC<ToolButtonProps> = ({ icon: Icon, onClick, label }) => (
+  <button 
+    onClick={onClick} 
+    className="p-1.5 text-workspace-muted hover:text-workspace-text hover:bg-workspace-surface rounded-md transition-colors focus:outline-none"
+    title={label}
+  >
+    <Icon className="w-4 h-4 stroke-[1.5]" />
+  </button>
+);
+
 const Notes: React.FC = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
@@ -40,26 +80,7 @@ const Notes: React.FC = () => {
 
   const activeNote = notes.find(n => n.id === activeNoteId);
 
-  // --- Helpers Seguros ---
-  
-  const safeDate = (dateInput: any): Date => {
-    if (!dateInput) return new Date();
-    // O Supabase retorna UTC string (ex: "2023-10-27T10:00:00+00:00")
-    // O JS converte automaticamente para local no construtor
-    const date = new Date(dateInput);
-    return isNaN(date.getTime()) ? new Date() : date;
-  };
-
-  const toFrontend = (data: any): Note => ({
-    id: data.id,
-    titulo: data.titulo || 'Sem Título',
-    conteudo: data.conteudo || '',
-    criado_em: safeDate(data.criado_em),
-    atualizado_em: safeDate(data.atualizado_em)
-  });
-
-  // --- Supabase Sync ---
-
+  // --- READ (Buscar dados) ---
   const fetchNotes = async () => {
     setIsSyncing(true);
     try {
@@ -67,18 +88,17 @@ const Notes: React.FC = () => {
         .from('notas')
         .select('*');
       
-      if (error) {
-        console.error('Erro Supabase:', error);
-      }
+      if (error) throw error;
       
       if (data && Array.isArray(data)) {
         const mappedNotes = data.map(toFrontend).sort((a, b) => 
-          b.atualizado_em.getTime() - a.atualizado_em.getTime()
+          b.updatedAt.getTime() - a.updatedAt.getTime()
         );
         setNotes(mappedNotes);
+        console.log('[SUPABASE] ✅ Notas sincronizadas');
       }
     } catch (e) {
-      console.error('Erro ao buscar notas:', e);
+      console.error('[SUPABASE] ❌ Erro ao buscar:', formatError(e));
     } finally {
       setIsSyncing(false);
     }
@@ -94,27 +114,30 @@ const Notes: React.FC = () => {
     setSelectedElement(null);
     
     if (contentEditableRef.current && activeNote) {
-      if (contentEditableRef.current.innerHTML !== activeNote.conteudo) {
-        contentEditableRef.current.innerHTML = activeNote.conteudo;
+      if (contentEditableRef.current.innerHTML !== activeNote.content) {
+        contentEditableRef.current.innerHTML = activeNote.content;
       }
     }
   }, [activeNoteId]);
 
-  // --- Actions ---
+  // --- CRUD Actions (Optimistic UI) ---
 
+  // CREATE
   const handleCreateNote = async () => {
+    // 1. Atualizar estado local IMEDIATAMENTE
     const tempId = `temp-${Date.now()}`;
     const newNote: Note = {
       id: tempId,
-      titulo: 'Nova Nota',
-      conteudo: '',
-      criado_em: new Date(),
-      atualizado_em: new Date(),
+      title: 'Nova Nota',
+      content: '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
     
-    setNotes([newNote, ...notes]);
+    setNotes(prev => [newNote, ...prev]);
     setActiveNoteId(tempId);
 
+    // 2. Enviar para Supabase em paralelo
     try {
       const { data, error } = await supabase
         .from('notas')
@@ -122,50 +145,61 @@ const Notes: React.FC = () => {
         .select()
         .single();
 
+      if (error) throw error;
+
+      // 3. Substituir temporário pelo real
       if (data) {
         const realNote = toFrontend(data);
         setNotes(current => current.map(n => n.id === tempId ? realNote : n));
         setActiveNoteId(realNote.id);
-      } else if (error) {
-        console.error('Erro ao criar nota:', error);
+        console.log('[SUPABASE] ✅ Nota criada');
       }
     } catch (e) {
-      console.error(e);
+      console.error('[SUPABASE] ❌ Erro ao criar:', formatError(e));
+      // Reverter estado
+      setNotes(prev => prev.filter(n => n.id !== tempId));
+      if (activeNoteId === tempId) setActiveNoteId(null);
+      alert(`Erro ao criar nota: ${formatError(e)}`);
     }
   };
 
+  // DELETE
   const handleDeleteNote = async (id: string) => {
-    const previousNotes = [...notes];
+    // 1. Guardar item para possível restauração
+    const noteRemovida = notes.find(n => n.id === id);
     const newNotes = notes.filter(n => n.id !== id);
+
+    // 2. Remover local IMEDIATAMENTE
     setNotes(newNotes);
     
     if (activeNoteId === id) {
       setActiveNoteId(newNotes.length > 0 ? newNotes[0].id : null);
     }
 
-    if (id.startsWith('temp-')) {
-      return;
-    }
+    if (id.startsWith('temp-')) return;
 
+    // 3. Enviar para Supabase
     try {
       const { error } = await supabase.from('notas').delete().eq('id', id);
-      if (error) {
-          throw error;
-      }
+      if (error) throw error;
+      console.log('[SUPABASE] ✅ Nota excluída');
     } catch (error) {
-      console.error('Erro ao excluir:', error);
-      alert('Erro ao sincronizar exclusão. A nota pode reaparecer ao recarregar.');
-      setNotes(previousNotes);
+      console.error('[SUPABASE] ❌ Erro ao excluir:', formatError(error));
+      // Restaurar
+      setNotes(prev => noteRemovida ? [noteRemovida, ...prev] : prev);
       if (activeNoteId === id) setActiveNoteId(id);
+      alert(`Erro ao excluir nota: ${formatError(error)}`);
     }
   };
 
+  // UPDATE (Optimistic with Debounce)
   const updateActiveNote = (updates: Partial<Note>) => {
     if (!activeNoteId) return;
 
+    // 1. Atualizar local IMEDIATAMENTE
     const updatedNotes = notes.map(note => 
       note.id === activeNoteId 
-        ? { ...note, ...updates, atualizado_em: new Date() } 
+        ? { ...note, ...updates, updatedAt: new Date() } 
         : note
     );
     setNotes(updatedNotes);
@@ -176,21 +210,23 @@ const Notes: React.FC = () => {
       if (activeNoteId.startsWith('temp-')) return;
       setIsSyncing(true);
       
-      // Mapeamento para o banco
-      const dbUpdates: any = {};
-      if (updates.titulo !== undefined) dbUpdates.titulo = updates.titulo;
-      if (updates.conteudo !== undefined) dbUpdates.conteudo = updates.conteudo;
-      
-      // Não enviamos 'atualizado_em' manual, pois o trigger moddatetime cuida disso no banco
-      // Mas podemos enviar 'atualizado_em' apenas para garantir se o trigger falhar, 
-      // porém a regra do prompt diz para confiar no trigger. Vamos deixar o trigger trabalhar.
-      
-      await supabase
-        .from('notas')
-        .update(dbUpdates)
-        .eq('id', activeNoteId);
-      
-      setIsSyncing(false);
+      // 2. Enviar para Supabase
+      try {
+        const noteToUpdate = updatedNotes.find(n => n.id === activeNoteId);
+        if (noteToUpdate) {
+            const { error } = await supabase
+                .from('notas')
+                .update(toSupabase(noteToUpdate))
+                .eq('id', activeNoteId);
+            
+            if (error) throw error;
+            console.log('[SUPABASE] ✅ Nota atualizada');
+        }
+      } catch (error) {
+        console.error('[SUPABASE] ❌ Erro ao atualizar:', formatError(error));
+      } finally {
+        setIsSyncing(false);
+      }
     }, 1000);
   };
 
@@ -224,7 +260,7 @@ const Notes: React.FC = () => {
   const execCommand = (command: string, value: string | undefined = undefined) => {
     restoreSelection();
     document.execCommand(command, false, value);
-    if (contentEditableRef.current) updateActiveNote({ conteudo: contentEditableRef.current.innerHTML });
+    if (contentEditableRef.current) updateActiveNote({ content: contentEditableRef.current.innerHTML });
   };
 
   const handleFormat = (command: string) => { saveSelection(); execCommand(command); };
@@ -283,7 +319,7 @@ const Notes: React.FC = () => {
     if (selectedElement && selectedElement.tagName === 'IMG') {
         selectedElement.style.width = width;
         selectedElement.style.height = 'auto';
-        if (contentEditableRef.current) updateActiveNote({ conteudo: contentEditableRef.current.innerHTML });
+        if (contentEditableRef.current) updateActiveNote({ content: contentEditableRef.current.innerHTML });
     }
   };
 
@@ -292,7 +328,7 @@ const Notes: React.FC = () => {
           selectedElement.style.display = 'block';
           selectedElement.style.marginLeft = align === 'center' || align === 'right' ? 'auto' : '0';
           selectedElement.style.marginRight = align === 'center' || align === 'left' ? 'auto' : '0';
-          if (contentEditableRef.current) updateActiveNote({ conteudo: contentEditableRef.current.innerHTML });
+          if (contentEditableRef.current) updateActiveNote({ content: contentEditableRef.current.innerHTML });
       }
   };
 
@@ -305,8 +341,8 @@ const Notes: React.FC = () => {
   };
 
   const filteredNotes = notes.filter(note => 
-    (note.titulo || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (note.conteudo || '').toLowerCase().includes(searchQuery.toLowerCase())
+    (note.title || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (note.content || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -346,11 +382,11 @@ const Notes: React.FC = () => {
               <div key={note.id} className={`group relative rounded-lg border transition-all duration-200 ${activeNoteId === note.id ? 'bg-workspace-surface border-transparent shadow-sm' : 'bg-transparent border-transparent hover:bg-workspace-surface hover:border-workspace-border'}`}>
                 <div onClick={() => setActiveNoteId(note.id)} className="p-3 cursor-pointer w-full select-none">
                     <div className="flex justify-between items-start mb-1">
-                        <h3 className={`text-sm font-medium truncate pr-8 ${activeNoteId === note.id ? 'text-workspace-text' : 'text-workspace-text/80'}`}>{note.titulo || 'Sem Título'}</h3>
+                        <h3 className={`text-sm font-medium truncate pr-8 ${activeNoteId === note.id ? 'text-workspace-text' : 'text-workspace-text/80'}`}>{note.title || 'Sem Título'}</h3>
                     </div>
-                    <div className="text-xs text-workspace-muted line-clamp-2 h-8 overflow-hidden font-light" dangerouslySetInnerHTML={{ __html: (note.conteudo || '').replace(/<[^>]+>/g, ' ') || 'Sem conteúdo...' }} />
+                    <div className="text-xs text-workspace-muted line-clamp-2 h-8 overflow-hidden font-light" dangerouslySetInnerHTML={{ __html: (note.content || '').replace(/<[^>]+>/g, ' ') || 'Sem conteúdo...' }} />
                     <span className="text-[10px] text-workspace-muted/60 mt-2 block font-mono">
-                        {note.atualizado_em instanceof Date && !isNaN(note.atualizado_em.getTime()) ? note.atualizado_em.toLocaleDateString() : 'Data inválida'}
+                        {note.updatedAt instanceof Date && !isNaN(note.updatedAt.getTime()) ? note.updatedAt.toLocaleDateString() : 'Data inválida'}
                     </span>
                 </div>
                 <button 
@@ -420,17 +456,17 @@ const Notes: React.FC = () => {
              )}
           </div>
           <div className="px-8 pt-8 pb-4">
-            <input type="text" value={activeNote.titulo} onChange={(e) => updateActiveNote({ titulo: e.target.value })} className="w-full text-3xl font-light text-workspace-text bg-transparent border-none outline-none placeholder-workspace-muted/40" placeholder="Título da Nota" />
+            <input type="text" value={activeNote.title} onChange={(e) => updateActiveNote({ title: e.target.value })} className="w-full text-3xl font-light text-workspace-text bg-transparent border-none outline-none placeholder-workspace-muted/40" placeholder="Título da Nota" />
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar px-8 pb-12 cursor-text" onClick={() => { if (document.activeElement !== contentEditableRef.current && !showLinkInput && !selectedElement) contentEditableRef.current?.focus(); }}>
-            <div ref={contentEditableRef} className={`w-full h-full outline-none text-workspace-text text-base leading-relaxed font-light prose prose-sm dark:prose-invert max-w-none ${selectedElement?.tagName === 'IMG' ? 'selection:bg-transparent' : ''}`} contentEditable onInput={(e) => updateActiveNote({ conteudo: e.currentTarget.innerHTML })} onKeyDown={handleKeyDown} onKeyUp={saveSelection} onMouseUp={saveSelection} onClick={handleEditorClick} suppressContentEditableWarning={true} style={{ minHeight: '50vh' }} data-placeholder="Comece a escrever aqui..." />
+            <div ref={contentEditableRef} className={`w-full h-full outline-none text-workspace-text text-base leading-relaxed font-light prose prose-sm dark:prose-invert max-w-none ${selectedElement?.tagName === 'IMG' ? 'selection:bg-transparent' : ''}`} contentEditable onInput={(e) => updateActiveNote({ content: e.currentTarget.innerHTML })} onKeyDown={handleKeyDown} onKeyUp={saveSelection} onMouseUp={saveSelection} onClick={handleEditorClick} suppressContentEditableWarning={true} style={{ minHeight: '50vh' }} data-placeholder="Comece a escrever aqui..." />
           </div>
           <div className="px-6 py-2 border-t border-workspace-border text-[10px] text-workspace-muted flex justify-between items-center bg-workspace-main">
               <div className="flex gap-4">
-                <span>{(activeNote.conteudo || '').replace(/<[^>]*>/g, '').length} caracteres</span>
+                <span>{(activeNote.content || '').replace(/<[^>]*>/g, '').length} caracteres</span>
                 {isSyncing ? <span className="text-workspace-accent animate-pulse">Salvando...</span> : <span>Salvo</span>}
               </div>
-              <span>Última edição: {activeNote.atualizado_em instanceof Date && !isNaN(activeNote.atualizado_em.getTime()) ? activeNote.atualizado_em.toLocaleTimeString() : '--:--'}</span>
+              <span>Última edição: {activeNote.updatedAt instanceof Date && !isNaN(activeNote.updatedAt.getTime()) ? activeNote.updatedAt.toLocaleTimeString() : '--:--'}</span>
           </div>
         </div>
       ) : (
@@ -442,11 +478,5 @@ const Notes: React.FC = () => {
     </div>
   );
 };
-
-const ToolButton: React.FC<{ icon: any, onClick: () => void, label: string }> = ({ icon: Icon, onClick, label }) => (
-  <button onMouseDown={(e) => e.preventDefault()} onClick={onClick} className="p-1.5 rounded hover:bg-workspace-surface hover:text-workspace-text text-workspace-muted transition-colors" title={label}>
-    <Icon className="w-4 h-4 stroke-[2]" />
-  </button>
-);
 
 export default Notes;

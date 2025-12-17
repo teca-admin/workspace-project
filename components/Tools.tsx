@@ -21,10 +21,64 @@ import {
 import { Tool } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
+// --- Mapeamento de Colunas (De/Para) ---
+
+// Frontend -> Supabase
+const toSupabase = (tool: Partial<Tool>) => {
+  return {
+    titulo: tool.title,
+    descricao: tool.description,
+    url: tool.url,
+    icone: tool.icon,
+    categoria: tool.category,
+    parent_id: tool.parentId,
+    is_folder: tool.isFolder
+  };
+};
+
+// Supabase -> Frontend
+const toFrontend = (data: any): Tool => ({
+  id: data.id,
+  title: data.titulo,
+  description: data.descricao || '',
+  url: data.url || '',
+  icon: data.icone,
+  category: data.categoria,
+  parentId: data.parent_id,
+  isFolder: data.is_folder || false,
+  createdAt: data.criado_em ? new Date(data.criado_em) : undefined,
+  updatedAt: data.atualizado_em ? new Date(data.atualizado_em) : undefined
+});
+
+// Helper para formatar erro
+const formatError = (error: any) => {
+  return error?.message || JSON.stringify(error);
+};
+
+// Helper para alertar erros de schema amigavelmente
+const alertError = (error: any, operation: string) => {
+  const msg = formatError(error);
+  console.error(`[SUPABASE] ❌ Erro ao ${operation}:`, msg);
+  
+  if (
+    msg.includes("Could not find the") || 
+    msg.includes("has no attribute") || 
+    msg.includes("does not exist")
+  ) {
+    let missingCol = "colunas necessárias";
+    if (msg.includes("atualizado_em")) missingCol = "'atualizado_em'";
+    if (msg.includes("is_folder")) missingCol = "'is_folder'";
+    
+    alert(`⚠️ Erro de Banco de Dados (Schema)\n\nO Supabase reportou que a tabela 'ferramentas' não possui a coluna ${missingCol}.\n\nIsso geralmente acontece quando o script de migração não foi executado ou a tabela está incompleta.\n\nSOLUÇÃO: Execute o arquivo 'supabase_fix.sql' no Editor SQL do Supabase para corrigir a estrutura da tabela.`);
+  } else {
+    alert(`Erro ao ${operation}: ${msg}`);
+  }
+};
+
 const Tools: React.FC = () => {
   const [tools, setTools] = useState<Tool[]>([]);
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null); // Navegação
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [iframeKey, setIframeKey] = useState(0); 
   const [showWarning, setShowWarning] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +89,7 @@ const Tools: React.FC = () => {
   
   // Estados de Edição/Criação
   const [editingToolId, setEditingToolId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ titulo: '', url: '', descricao: '', isFolder: false });
+  const [formData, setFormData] = useState({ title: '', url: '', description: '', isFolder: false });
   
   // Estado para Mover
   const [toolToMove, setToolToMove] = useState<Tool | null>(null);
@@ -44,29 +98,20 @@ const Tools: React.FC = () => {
   const [draggedToolId, setDraggedToolId] = useState<string | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
-  // --- Helpers Seguros ---
-  const toFrontend = (data: any): Tool => ({
-    id: data.id,
-    titulo: data.titulo,
-    descricao: data.descricao || '',
-    url: data.url || '',
-    icone: data.icone,
-    categoria: data.categoria,
-    parentId: data.parent_id,
-    isFolder: data.is_folder || false
-  });
-
+  // --- READ (Buscar dados) ---
   const fetchTools = async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.from('ferramentas').select('*');
-      if (data && Array.isArray(data)) {
+      if (error) throw error;
+      
+      if (data) {
         setTools(data.map(toFrontend));
-      } else if (error) {
-        console.error('Erro ao buscar ferramentas:', error);
+        console.log('[SUPABASE] ✅ Dados sincronizados');
       }
     } catch (e) {
-      console.error('Erro inesperado:', e);
+      // Apenas loga erro de fetch, não alerta para não bloquear a UI na carga
+      console.error('[SUPABASE] ❌ Erro ao buscar:', formatError(e));
     } finally {
       setIsLoading(false);
     }
@@ -92,8 +137,6 @@ const Tools: React.FC = () => {
 
   // --- Navegação de Pastas ---
   
-  const getCurrentFolder = () => tools.find(t => t.id === currentFolderId);
-  
   const getBreadcrumbs = () => {
     const path = [];
     let currentId = currentFolderId;
@@ -109,23 +152,23 @@ const Tools: React.FC = () => {
     return path;
   };
 
-  // --- CRUD Actions ---
+  // --- CRUD Actions (Optimistic UI) ---
 
   const handleOpenModal = (tool?: Tool, createFolder: boolean = false) => {
     if (tool) {
       setEditingToolId(tool.id);
       setFormData({ 
-        titulo: tool.titulo, 
+        title: tool.title, 
         url: tool.url, 
-        descricao: tool.descricao,
+        description: tool.description,
         isFolder: !!tool.isFolder
       });
     } else {
       setEditingToolId(null);
       setFormData({ 
-        titulo: '', 
+        title: '', 
         url: '', 
-        descricao: '', 
+        description: '', 
         isFolder: createFolder 
       });
     }
@@ -135,28 +178,34 @@ const Tools: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingToolId(null);
-    setFormData({ titulo: '', url: '', descricao: '', isFolder: false });
+    setFormData({ title: '', url: '', description: '', isFolder: false });
   };
 
+  // DELETE
   const handleDelete = async (id: string) => {
-    // Delete otimista
-    const previousTools = [...tools];
-    setTools(tools.filter(t => t.id !== id && t.parentId !== id)); 
-
+    // 1. Guardar item para possível restauração
+    const itemRemovido = tools.find(item => item.id === id);
+    const filhosRemovidos = tools.filter(item => item.parentId === id);
+    
+    // 2. Remover local IMEDIATAMENTE
+    setTools(prev => prev.filter(t => t.id !== id && t.parentId !== id)); 
+    
     if (id.startsWith('temp-')) return;
 
+    // 3. Enviar para Supabase
     try {
       const { error } = await supabase.from('ferramentas').delete().eq('id', id);
       if (error) throw error;
+      console.log('[SUPABASE] ✅ Item removido');
     } catch (error) {
-      console.error('Erro ao deletar:', error);
-      alert('Erro ao excluir. Tente novamente.');
-      setTools(previousTools);
+      // Restaurar item
+      setTools(prev => [...prev, itemRemovido!, ...filhosRemovidos]);
+      alertError(error, 'excluir');
     }
   };
 
   const handleSave = async () => {
-    if (!formData.titulo) return;
+    if (!formData.title) return;
     if (!formData.isFolder && !formData.url) return;
 
     let formattedUrl = formData.url;
@@ -170,53 +219,87 @@ const Tools: React.FC = () => {
         }
     }
 
-    // Payload usando snake_case para o banco
-    const payload = {
-      titulo: formData.titulo,
+    const toolData: Partial<Tool> = {
+      title: formData.title,
       url: formattedUrl,
-      descricao: formData.descricao,
-      categoria: formData.isFolder ? 'Folder' : 'Geral',
-      is_folder: formData.isFolder,
-      parent_id: currentFolderId
-    };
-
-    // Adaptação otimista para o frontend (camelCase)
-    const optimisticTool: Tool = {
-        id: editingToolId || `temp-${Date.now()}`,
-        titulo: formData.titulo,
-        url: formattedUrl,
-        descricao: formData.descricao,
-        categoria: payload.categoria,
-        isFolder: formData.isFolder,
-        parentId: currentFolderId
+      description: formData.description,
+      category: formData.isFolder ? 'Folder' : 'Geral',
+      isFolder: formData.isFolder,
+      parentId: currentFolderId
     };
 
     if (editingToolId) {
-      // Update
-      const previousTools = [...tools];
-      setTools(tools.map(t => t.id === editingToolId ? { ...t, ...optimisticTool, id: editingToolId } : t));
+      // UPDATE
+      // 1. Atualizar local IMEDIATAMENTE
+      setTools(prev => prev.map(t => t.id === editingToolId ? { ...t, ...toolData } : t));
       handleCloseModal();
 
-      const { error } = await supabase.from('ferramentas').update(payload).eq('id', editingToolId);
-      if (error) { console.error(error); setTools(previousTools); }
+      // 2. Enviar para Supabase
+      try {
+         const { error } = await supabase.from('ferramentas').update(toSupabase(toolData)).eq('id', editingToolId);
+         if (error) throw error;
+         console.log('[SUPABASE] ✅ Item atualizado');
+      } catch (error) {
+         fetchTools(); // Revert/Refetch
+         alertError(error, 'atualizar');
+      }
 
     } else {
-      // Create
-      setTools([optimisticTool, ...tools]);
+      // CREATE
+      // 1. Atualizar estado local IMEDIATAMENTE
+      const tempId = `temp-${Date.now()}`;
+      const optimisticTool: Tool = {
+          id: tempId,
+          ...toolData
+      } as Tool;
+
+      setTools(prev => [optimisticTool, ...prev]);
       handleCloseModal();
 
-      const { data, error } = await supabase.from('ferramentas').insert([payload]).select().single();
-      if (data) {
-        const realTool = toFrontend(data);
-        setTools(current => current.map(t => t.id === optimisticTool.id ? realTool : t));
-      } else if (error) {
-        console.error(error);
-        setTools(current => current.filter(t => t.id !== optimisticTool.id));
+      // 2. Enviar para Supabase
+      try {
+        const { data, error } = await supabase
+            .from('ferramentas')
+            .insert(toSupabase(toolData))
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // 3. Substituir temporário pelo real
+        setTools(prev => prev.map(t => t.id === tempId ? toFrontend(data) : t));
+        console.log('[SUPABASE] ✅ Item adicionado');
+      } catch (error) {
+        // Reverter estado
+        setTools(prev => prev.filter(t => t.id !== tempId));
+        alertError(error, 'adicionar');
       }
     }
   };
 
-  // --- Drag and Drop Logic ---
+  // --- Move Logic (Optimistic UI) ---
+
+  const moveTool = async (toolId: string, targetFolderId: string | null) => {
+      // 1. Atualizar local IMEDIATAMENTE
+      const previousTools = [...tools];
+      setTools(prev => prev.map(t => t.id === toolId ? { ...t, parentId: targetFolderId } : t));
+      
+      // 2. Enviar para Supabase
+      try {
+          const { error } = await supabase
+            .from('ferramentas')
+            .update({ parent_id: targetFolderId })
+            .eq('id', toolId);
+            
+          if (error) throw error;
+          console.log('[SUPABASE] ✅ Item movido');
+      } catch (err) {
+          setTools(previousTools); // Revert
+          alertError(err, 'mover');
+      }
+  };
+
+  // --- Drag and Drop ---
 
   const handleDragStart = (e: React.DragEvent, toolId: string) => {
       setDraggedToolId(toolId);
@@ -246,26 +329,6 @@ const Tools: React.FC = () => {
       setDraggedToolId(null);
   };
 
-  // --- Move Logic (Drag & Modal) ---
-
-  const moveTool = async (toolId: string, targetFolderId: string | null) => {
-      const previousTools = [...tools];
-      setTools(tools.map(t => t.id === toolId ? { ...t, parentId: targetFolderId } : t));
-      
-      try {
-          const { error } = await supabase
-            .from('ferramentas')
-            .update({ parent_id: targetFolderId })
-            .eq('id', toolId);
-            
-          if (error) throw error;
-      } catch (err) {
-          console.error("Erro ao mover:", err);
-          setTools(previousTools);
-          alert("Não foi possível mover o item.");
-      }
-  };
-
   const openMoveModal = (tool: Tool) => {
       setToolToMove(tool);
       setIsMoveModalOpen(true);
@@ -292,7 +355,7 @@ const Tools: React.FC = () => {
             </button>
             <div className="flex items-center gap-3">
               <img src={getFavicon(activeTool.url)} alt="icon" className="w-5 h-5 rounded-sm opacity-80" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              <h2 className="text-sm font-medium text-workspace-text tracking-wide">{activeTool.titulo}</h2>
+              <h2 className="text-sm font-medium text-workspace-text tracking-wide">{activeTool.title}</h2>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -320,7 +383,7 @@ const Tools: React.FC = () => {
                 <Globe className="w-10 h-10 mb-3 opacity-20" />
                 <p className="text-xs font-light opacity-40">Carregando interface remota...</p>
              </div>
-             <iframe key={iframeKey} src={activeTool.url} className="w-full h-full border-none relative z-10 bg-white" title={activeTool.titulo} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation" />
+             <iframe key={iframeKey} src={activeTool.url} className="w-full h-full border-none relative z-10 bg-white" title={activeTool.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation" />
         </div>
       </div>
     );
@@ -358,7 +421,7 @@ const Tools: React.FC = () => {
                         onClick={() => setCurrentFolderId(folder.id)} 
                         className={`p-1 rounded hover:bg-workspace-surface hover:text-workspace-text transition-colors ${index === getBreadcrumbs().length - 1 ? 'text-workspace-text font-medium' : ''}`}
                     >
-                        {folder.titulo}
+                        {folder.title}
                     </button>
                 </React.Fragment>
             ))}
@@ -410,11 +473,11 @@ const Tools: React.FC = () => {
                       </div>
                       
                       <div className="flex-1 min-w-0 pr-14"> 
-                          <h3 className="text-sm font-medium text-workspace-text truncate mb-1">{tool.titulo}</h3>
+                          <h3 className="text-sm font-medium text-workspace-text truncate mb-1">{tool.title}</h3>
                           <p className="text-xs text-workspace-muted line-clamp-2 leading-relaxed font-light">
                               {tool.isFolder 
                                 ? `${tools.filter(t => t.parentId === tool.id).length} itens` 
-                                : (tool.descricao || "Sem descrição.")}
+                                : (tool.description || "Sem descrição.")}
                           </p>
                       </div>
 
@@ -456,15 +519,15 @@ const Tools: React.FC = () => {
               {editingToolId ? 'Editar' : (formData.isFolder ? 'Nova Pasta' : 'Nova Ferramenta')}
             </h2>
             <div className="space-y-4">
-              <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Título</label><input type="text" value={formData.titulo} onChange={(e) => setFormData({...formData, titulo: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors" placeholder="Ex: Financeiro" autoFocus /></div>
+              <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Título</label><input type="text" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors" placeholder="Ex: Financeiro" autoFocus /></div>
               {!formData.isFolder && (
                   <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Link (URL)</label><input type="text" value={formData.url} onChange={(e) => setFormData({...formData, url: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors" placeholder="Ex: https://google.com" /></div>
               )}
-              <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Descrição (Opcional)</label><textarea value={formData.descricao} onChange={(e) => setFormData({...formData, descricao: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors h-24 resize-none" placeholder="Detalhes..." /></div>
+              <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Descrição (Opcional)</label><textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors h-24 resize-none" placeholder="Detalhes..." /></div>
             </div>
             <div className="mt-8 flex justify-end gap-3">
               <button onClick={handleCloseModal} className="px-4 py-2 text-xs font-medium text-workspace-text hover:bg-workspace-main rounded-md transition-colors">CANCELAR</button>
-              <button onClick={handleSave} disabled={!formData.titulo || (!formData.isFolder && !formData.url)} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"><Save className="w-3 h-3" /> SALVAR</button>
+              <button onClick={handleSave} disabled={!formData.title || (!formData.isFolder && !formData.url)} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"><Save className="w-3 h-3" /> SALVAR</button>
             </div>
           </div>
         </div>
@@ -475,7 +538,7 @@ const Tools: React.FC = () => {
            <div className="bg-workspace-surface w-full max-w-sm border border-workspace-border rounded-lg shadow-2xl p-6 relative m-4">
                 <button onClick={() => setIsMoveModalOpen(false)} className="absolute top-4 right-4 text-workspace-muted hover:text-workspace-text transition-colors"><X className="w-5 h-5" /></button>
                 <h2 className="text-lg font-light text-workspace-text mb-4 flex items-center gap-2">
-                    <Move className="w-5 h-5" /> Mover "{toolToMove?.titulo}" para...
+                    <Move className="w-5 h-5" /> Mover "{toolToMove?.title}" para...
                 </h2>
                 <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar my-4">
                     <button 
@@ -492,7 +555,7 @@ const Tools: React.FC = () => {
                             onClick={() => handleMoveConfirm(folder.id)}
                             className={`w-full flex items-center gap-2 p-2 rounded-md hover:bg-workspace-main transition-colors text-sm ${toolToMove?.parentId === folder.id ? 'text-workspace-accent font-medium bg-workspace-accent/5' : 'text-workspace-text'}`}
                         >
-                            <Folder className="w-4 h-4 text-workspace-muted" /> {folder.titulo}
+                            <Folder className="w-4 h-4 text-workspace-muted" /> {folder.title}
                         </button>
                     ))}
                 </div>
