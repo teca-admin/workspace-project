@@ -28,6 +28,9 @@ export interface Tool {
   url: string;
   icone?: string;
   categoria?: string;
+  // Novos campos para sistema de pastas
+  parentId?: string | null; 
+  isFolder?: boolean;
 }
 
 export interface Note {

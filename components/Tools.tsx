@@ -1,31 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ExternalLink, ArrowLeft, Globe, Loader2, AlertCircle, RefreshCw, X, Pencil, Trash2, Save } from 'lucide-react';
+import { 
+  Plus, 
+  ExternalLink, 
+  ArrowLeft, 
+  Globe, 
+  Loader2, 
+  AlertCircle, 
+  RefreshCw, 
+  X, 
+  Pencil, 
+  Trash2, 
+  Save,
+  Folder,
+  FolderPlus,
+  CornerUpLeft,
+  Move,
+  ChevronRight,
+  Home
+} from 'lucide-react';
 import { Tool } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
 const Tools: React.FC = () => {
   const [tools, setTools] = useState<Tool[]>([]);
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null); // Navegação
   const [iframeKey, setIframeKey] = useState(0); 
   const [showWarning, setShowWarning] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Modais
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  
+  // Estados de Edição/Criação
   const [editingToolId, setEditingToolId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ titulo: '', url: '', descricao: '' });
+  const [formData, setFormData] = useState({ titulo: '', url: '', descricao: '', isFolder: false });
+  
+  // Estado para Mover
+  const [toolToMove, setToolToMove] = useState<Tool | null>(null);
+
+  // Drag and Drop State
+  const [draggedToolId, setDraggedToolId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
   // --- Helpers Seguros ---
   const toFrontend = (data: any): Tool => ({
     id: data.id,
-    titulo: data.titulo || data.title || 'Ferramenta',
-    descricao: data.descricao || data.description || '',
+    titulo: data.titulo,
+    descricao: data.descricao || '',
     url: data.url || '',
     icone: data.icone,
-    categoria: data.categoria
+    categoria: data.categoria,
+    parentId: data.parent_id,
+    isFolder: data.is_folder || false
   });
 
   const fetchTools = async () => {
-    // Prompt: Implementação de Optimistic UI com Supabase (READ/INIT)
     setIsLoading(true);
     try {
       const { data, error } = await supabase.from('ferramentas').select('*');
@@ -59,13 +90,44 @@ const Tools: React.FC = () => {
     setIframeKey(prev => prev + 1);
   };
 
-  const handleOpenModal = (tool?: Tool) => {
+  // --- Navegação de Pastas ---
+  
+  const getCurrentFolder = () => tools.find(t => t.id === currentFolderId);
+  
+  const getBreadcrumbs = () => {
+    const path = [];
+    let currentId = currentFolderId;
+    while (currentId) {
+      const folder = tools.find(t => t.id === currentId);
+      if (folder) {
+        path.unshift(folder);
+        currentId = folder.parentId || null;
+      } else {
+        break;
+      }
+    }
+    return path;
+  };
+
+  // --- CRUD Actions ---
+
+  const handleOpenModal = (tool?: Tool, createFolder: boolean = false) => {
     if (tool) {
       setEditingToolId(tool.id);
-      setFormData({ titulo: tool.titulo, url: tool.url, descricao: tool.descricao });
+      setFormData({ 
+        titulo: tool.titulo, 
+        url: tool.url, 
+        descricao: tool.descricao,
+        isFolder: !!tool.isFolder
+      });
     } else {
       setEditingToolId(null);
-      setFormData({ titulo: '', url: '', descricao: '' });
+      setFormData({ 
+        titulo: '', 
+        url: '', 
+        descricao: '', 
+        isFolder: createFolder 
+      });
     }
     setIsModalOpen(true);
   };
@@ -73,16 +135,14 @@ const Tools: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingToolId(null);
-    setFormData({ titulo: '', url: '', descricao: '' });
+    setFormData({ titulo: '', url: '', descricao: '', isFolder: false });
   };
 
   const handleDelete = async (id: string) => {
-    // Prompt: Implementação de Optimistic UI com Supabase (DELETE)
-    // Optimistic UI: Remove imediatamente da lista antes do servidor
+    // Delete otimista
     const previousTools = [...tools];
-    setTools(tools.filter(t => t.id !== id));
+    setTools(tools.filter(t => t.id !== id && t.parentId !== id)); 
 
-    // Se for ID temporário, não chama backend
     if (id.startsWith('temp-')) return;
 
     try {
@@ -90,58 +150,137 @@ const Tools: React.FC = () => {
       if (error) throw error;
     } catch (error) {
       console.error('Erro ao deletar:', error);
-      alert('Erro ao excluir ferramenta. Ela pode reaparecer ao atualizar.');
-      setTools(previousTools); // Rollback
+      alert('Erro ao excluir. Tente novamente.');
+      setTools(previousTools);
     }
   };
 
   const handleSave = async () => {
-    if (!formData.titulo || !formData.url) return;
+    if (!formData.titulo) return;
+    if (!formData.isFolder && !formData.url) return;
 
     let formattedUrl = formData.url;
-    try {
-        if (!formattedUrl.startsWith('http')) formattedUrl = `https://${formattedUrl}`;
-        new URL(formattedUrl); // Validate
-    } catch (e) {
-        alert("URL inválida.");
-        return;
+    if (!formData.isFolder) {
+        try {
+            if (formattedUrl && !formattedUrl.startsWith('http')) formattedUrl = `https://${formattedUrl}`;
+            if (formattedUrl) new URL(formattedUrl);
+        } catch (e) {
+            alert("URL inválida.");
+            return;
+        }
     }
 
+    // Payload usando snake_case para o banco
     const payload = {
       titulo: formData.titulo,
       url: formattedUrl,
       descricao: formData.descricao,
-      categoria: 'Geral'
+      categoria: formData.isFolder ? 'Folder' : 'Geral',
+      is_folder: formData.isFolder,
+      parent_id: currentFolderId
+    };
+
+    // Adaptação otimista para o frontend (camelCase)
+    const optimisticTool: Tool = {
+        id: editingToolId || `temp-${Date.now()}`,
+        titulo: formData.titulo,
+        url: formattedUrl,
+        descricao: formData.descricao,
+        categoria: payload.categoria,
+        isFolder: formData.isFolder,
+        parentId: currentFolderId
     };
 
     if (editingToolId) {
-      // Prompt: Implementação de Optimistic UI com Supabase (UPDATE)
-      // Atualização imediata no estado local
+      // Update
       const previousTools = [...tools];
-      setTools(tools.map(t => t.id === editingToolId ? { ...t, ...payload } : t));
+      setTools(tools.map(t => t.id === editingToolId ? { ...t, ...optimisticTool, id: editingToolId } : t));
       handleCloseModal();
 
       const { error } = await supabase.from('ferramentas').update(payload).eq('id', editingToolId);
       if (error) { console.error(error); setTools(previousTools); }
 
     } else {
-      // Prompt: Implementação de Optimistic UI com Supabase (CREATE)
-      // Criação imediata com ID temporário
-      const tempId = `temp-${Date.now()}`;
-      const newTool: Tool = { id: tempId, ...payload };
-      setTools([newTool, ...tools]);
+      // Create
+      setTools([optimisticTool, ...tools]);
       handleCloseModal();
 
       const { data, error } = await supabase.from('ferramentas').insert([payload]).select().single();
       if (data) {
         const realTool = toFrontend(data);
-        setTools(current => current.map(t => t.id === tempId ? realTool : t));
+        setTools(current => current.map(t => t.id === optimisticTool.id ? realTool : t));
       } else if (error) {
         console.error(error);
-        setTools(current => current.filter(t => t.id !== tempId));
+        setTools(current => current.filter(t => t.id !== optimisticTool.id));
       }
     }
   };
+
+  // --- Drag and Drop Logic ---
+
+  const handleDragStart = (e: React.DragEvent, toolId: string) => {
+      setDraggedToolId(toolId);
+      e.dataTransfer.setData("toolId", toolId);
+      e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, folderId: string) => {
+      e.preventDefault();
+      if (draggedToolId !== folderId) {
+          setDragOverFolderId(folderId);
+      }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+      setDragOverFolderId(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetFolderId: string) => {
+      e.preventDefault();
+      setDragOverFolderId(null);
+      const toolId = e.dataTransfer.getData("toolId");
+      
+      if (toolId && toolId !== targetFolderId) {
+          await moveTool(toolId, targetFolderId);
+      }
+      setDraggedToolId(null);
+  };
+
+  // --- Move Logic (Drag & Modal) ---
+
+  const moveTool = async (toolId: string, targetFolderId: string | null) => {
+      const previousTools = [...tools];
+      setTools(tools.map(t => t.id === toolId ? { ...t, parentId: targetFolderId } : t));
+      
+      try {
+          const { error } = await supabase
+            .from('ferramentas')
+            .update({ parent_id: targetFolderId })
+            .eq('id', toolId);
+            
+          if (error) throw error;
+      } catch (err) {
+          console.error("Erro ao mover:", err);
+          setTools(previousTools);
+          alert("Não foi possível mover o item.");
+      }
+  };
+
+  const openMoveModal = (tool: Tool) => {
+      setToolToMove(tool);
+      setIsMoveModalOpen(true);
+  };
+
+  const handleMoveConfirm = (targetFolderId: string | null) => {
+      if (toolToMove) {
+          moveTool(toolToMove.id, targetFolderId);
+          setIsMoveModalOpen(false);
+          setToolToMove(null);
+      }
+  };
+
+  const visibleTools = tools.filter(t => t.parentId === currentFolderId);
+  visibleTools.sort((a, b) => (a.isFolder === b.isFolder ? 0 : a.isFolder ? -1 : 1));
 
   if (activeTool) {
     return (
@@ -189,64 +328,117 @@ const Tools: React.FC = () => {
 
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col animate-fade-in relative">
-      <div className="mb-8 flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-light text-workspace-text tracking-tight mb-2">Ferramentas Integradas</h1>
-          <p className="text-sm text-workspace-muted font-light">Gerencie e acesse seus utilitários externos.</p>
+      <div className="mb-6">
+        <div className="flex items-end justify-between mb-4">
+            <div>
+            <h1 className="text-2xl font-light text-workspace-text tracking-tight mb-2">Ferramentas Integradas</h1>
+            <p className="text-sm text-workspace-muted font-light">Gerencie e acesse seus utilitários externos.</p>
+            </div>
+            <div className="flex gap-2">
+                <button onClick={() => handleOpenModal(undefined, true)} className="flex items-center gap-2 px-4 py-2 bg-workspace-surface border border-workspace-border hover:bg-workspace-accent-hover text-workspace-text text-xs font-medium tracking-wide rounded-md transition-all">
+                    <FolderPlus className="w-4 h-4" /> NOVA PASTA
+                </button>
+                <button onClick={() => handleOpenModal(undefined, false)} className="flex items-center gap-2 px-4 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all">
+                    <Plus className="w-4 h-4" /> NOVA FERRAMENTA
+                </button>
+            </div>
         </div>
-        <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-4 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all">
-            <Plus className="w-4 h-4" /> NOVA FERRAMENTA
-        </button>
+
+        <div className="flex items-center gap-1 text-sm text-workspace-muted bg-workspace-surface/50 p-2 rounded-md border border-workspace-border/50">
+            <button 
+                onClick={() => setCurrentFolderId(null)} 
+                className={`p-1 rounded hover:bg-workspace-surface hover:text-workspace-text flex items-center gap-1 transition-colors ${!currentFolderId ? 'text-workspace-text font-medium' : ''}`}
+            >
+                <Home className="w-3.5 h-3.5" /> Início
+            </button>
+            {getBreadcrumbs().map((folder, index) => (
+                <React.Fragment key={folder.id}>
+                    <ChevronRight className="w-3 h-3 opacity-50" />
+                    <button 
+                        onClick={() => setCurrentFolderId(folder.id)} 
+                        className={`p-1 rounded hover:bg-workspace-surface hover:text-workspace-text transition-colors ${index === getBreadcrumbs().length - 1 ? 'text-workspace-text font-medium' : ''}`}
+                    >
+                        {folder.titulo}
+                    </button>
+                </React.Fragment>
+            ))}
+        </div>
       </div>
+
       <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10">
         {isLoading && tools.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-workspace-muted"><Loader2 className="w-6 h-6 animate-spin mb-2" /><p className="text-xs">Sincronizando...</p></div>
-        ) : tools.length === 0 ? (
+        ) : visibleTools.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-workspace-muted opacity-60">
-             <Globe className="w-12 h-12 mb-4 stroke-[1]" />
-             <p className="font-light">Nenhuma ferramenta adicionada.</p>
-             <p className="text-xs mt-2">Clique em "Nova Ferramenta" para começar.</p>
+             <div className="relative">
+                <Globe className="w-12 h-12 mb-4 stroke-[1]" />
+                {currentFolderId && <Folder className="w-6 h-6 absolute -bottom-1 -right-1 text-workspace-accent" />}
+             </div>
+             <p className="font-light">Pasta vazia.</p>
+             <p className="text-xs mt-2">Arraste itens para cá ou crie novos.</p>
+             {currentFolderId && (
+                 <button onClick={() => setCurrentFolderId(null)} className="mt-4 flex items-center gap-2 text-xs hover:underline">
+                     <CornerUpLeft className="w-3 h-3" /> Voltar para o Início
+                 </button>
+             )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tools.map((tool) => (
-                  <div key={tool.id} onClick={() => setActiveTool(tool)} className="group relative bg-workspace-surface border border-workspace-border rounded-lg p-5 cursor-pointer hover:border-workspace-accent hover:bg-workspace-accent-hover transition-all duration-300 flex items-start gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-workspace-main border border-workspace-border flex items-center justify-center shrink-0 group-hover:bg-workspace-accent-hover transition-colors">
-                          <img src={getFavicon(tool.url)} alt="" className="w-5 h-5 opacity-70 group-hover:opacity-100 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                          <Globe className="w-4 h-4 text-workspace-muted absolute -z-10" />
+              {visibleTools.map((tool) => (
+                  <div 
+                    key={tool.id} 
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, tool.id)}
+                    onDragOver={(e) => tool.isFolder ? handleDragOver(e, tool.id) : undefined}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => tool.isFolder ? handleDrop(e, tool.id) : undefined}
+                    onClick={() => tool.isFolder ? setCurrentFolderId(tool.id) : setActiveTool(tool)} 
+                    className={`
+                        group relative bg-workspace-surface border rounded-lg p-5 cursor-pointer transition-all duration-300 flex items-start gap-4 select-none
+                        ${dragOverFolderId === tool.id ? 'border-workspace-accent ring-2 ring-workspace-accent/20 bg-workspace-accent/5' : 'border-workspace-border hover:border-workspace-accent hover:bg-workspace-accent-hover'}
+                    `}
+                  >
+                      <div className={`w-10 h-10 rounded-lg border border-workspace-border flex items-center justify-center shrink-0 transition-colors ${tool.isFolder ? 'bg-workspace-surface text-workspace-accent' : 'bg-workspace-main group-hover:bg-workspace-accent-hover'}`}>
+                          {tool.isFolder ? (
+                              <Folder className="w-5 h-5 fill-workspace-accent/10" />
+                          ) : (
+                              <>
+                                <img src={getFavicon(tool.url)} alt="" className="w-5 h-5 opacity-70 group-hover:opacity-100 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                <Globe className="w-4 h-4 text-workspace-muted absolute -z-10" />
+                              </>
+                          )}
                       </div>
+                      
                       <div className="flex-1 min-w-0 pr-14"> 
                           <h3 className="text-sm font-medium text-workspace-text truncate mb-1">{tool.titulo}</h3>
-                          <p className="text-xs text-workspace-muted line-clamp-2 leading-relaxed font-light">{tool.descricao || "Sem descrição."}</p>
+                          <p className="text-xs text-workspace-muted line-clamp-2 leading-relaxed font-light">
+                              {tool.isFolder 
+                                ? `${tools.filter(t => t.parentId === tool.id).length} itens` 
+                                : (tool.descricao || "Sem descrição.")}
+                          </p>
                       </div>
+
                       <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <button 
-                            onClick={(e) => { 
-                                e.preventDefault();
-                                e.stopPropagation(); 
-                                handleOpenModal(tool); 
-                            }} 
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onMouseUp={(e) => e.stopPropagation()}
-                            className="p-1.5 text-workspace-muted hover:text-workspace-text hover:bg-workspace-main rounded-md transition-colors relative z-20" 
-                            title="Editar"
-                            type="button"
+                            onClick={(e) => { e.stopPropagation(); openMoveModal(tool); }} 
+                            className="p-1.5 text-workspace-muted hover:text-workspace-text hover:bg-workspace-main rounded-md transition-colors" 
+                            title="Mover"
                           >
-                              <Pencil className="w-3.5 h-3.5 pointer-events-none" />
+                              <Move className="w-3.5 h-3.5" />
                           </button>
                           <button 
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleDelete(tool.id);
-                            }} 
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onMouseUp={(e) => e.stopPropagation()}
-                            className="p-1.5 text-workspace-muted hover:text-red-500 hover:bg-workspace-main rounded-md transition-colors relative z-20" 
-                            title="Excluir"
-                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleOpenModal(tool); }} 
+                            className="p-1.5 text-workspace-muted hover:text-workspace-text hover:bg-workspace-main rounded-md transition-colors" 
+                            title="Editar"
                           >
-                              <Trash2 className="w-3.5 h-3.5 pointer-events-none" />
+                              <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDelete(tool.id); }} 
+                            className="p-1.5 text-workspace-muted hover:text-red-500 hover:bg-workspace-main rounded-md transition-colors" 
+                            title="Excluir"
+                          >
+                              <Trash2 className="w-3.5 h-3.5" />
                           </button>
                       </div>
                   </div>
@@ -260,20 +452,54 @@ const Tools: React.FC = () => {
           <div className="bg-workspace-surface w-full max-w-md border border-workspace-border rounded-lg shadow-2xl p-6 relative m-4">
             <button onClick={handleCloseModal} className="absolute top-4 right-4 text-workspace-muted hover:text-workspace-text transition-colors"><X className="w-5 h-5" /></button>
             <h2 className="text-lg font-light text-workspace-text mb-6 flex items-center gap-2">
-              {editingToolId ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {editingToolId ? 'Editar Ferramenta' : 'Nova Ferramenta'}
+              {editingToolId ? <Pencil className="w-5 h-5" /> : (formData.isFolder ? <FolderPlus className="w-5 h-5" /> : <Plus className="w-5 h-5" />)} 
+              {editingToolId ? 'Editar' : (formData.isFolder ? 'Nova Pasta' : 'Nova Ferramenta')}
             </h2>
             <div className="space-y-4">
-              <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Título</label><input type="text" value={formData.titulo} onChange={(e) => setFormData({...formData, titulo: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors" placeholder="Ex: Minha Planilha" /></div>
-              <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Link (URL)</label><input type="text" value={formData.url} onChange={(e) => setFormData({...formData, url: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors" placeholder="Ex: https://google.com" /></div>
-              <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Breve Descrição</label><textarea value={formData.descricao} onChange={(e) => setFormData({...formData, descricao: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors h-24 resize-none" placeholder="Descreva o propósito desta ferramenta..." /></div>
+              <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Título</label><input type="text" value={formData.titulo} onChange={(e) => setFormData({...formData, titulo: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors" placeholder="Ex: Financeiro" autoFocus /></div>
+              {!formData.isFolder && (
+                  <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Link (URL)</label><input type="text" value={formData.url} onChange={(e) => setFormData({...formData, url: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors" placeholder="Ex: https://google.com" /></div>
+              )}
+              <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Descrição (Opcional)</label><textarea value={formData.descricao} onChange={(e) => setFormData({...formData, descricao: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors h-24 resize-none" placeholder="Detalhes..." /></div>
             </div>
             <div className="mt-8 flex justify-end gap-3">
               <button onClick={handleCloseModal} className="px-4 py-2 text-xs font-medium text-workspace-text hover:bg-workspace-main rounded-md transition-colors">CANCELAR</button>
-              <button onClick={handleSave} disabled={!formData.titulo || !formData.url} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"><Save className="w-3 h-3" /> SALVAR</button>
+              <button onClick={handleSave} disabled={!formData.titulo || (!formData.isFolder && !formData.url)} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"><Save className="w-3 h-3" /> SALVAR</button>
             </div>
           </div>
         </div>
       )}
+
+      {isMoveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+           <div className="bg-workspace-surface w-full max-w-sm border border-workspace-border rounded-lg shadow-2xl p-6 relative m-4">
+                <button onClick={() => setIsMoveModalOpen(false)} className="absolute top-4 right-4 text-workspace-muted hover:text-workspace-text transition-colors"><X className="w-5 h-5" /></button>
+                <h2 className="text-lg font-light text-workspace-text mb-4 flex items-center gap-2">
+                    <Move className="w-5 h-5" /> Mover "{toolToMove?.titulo}" para...
+                </h2>
+                <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar my-4">
+                    <button 
+                        onClick={() => handleMoveConfirm(null)}
+                        className={`w-full flex items-center gap-2 p-2 rounded-md hover:bg-workspace-main transition-colors text-sm ${!toolToMove?.parentId ? 'text-workspace-accent font-medium bg-workspace-accent/5' : 'text-workspace-text'}`}
+                    >
+                        <Home className="w-4 h-4" /> Início (Workspace)
+                    </button>
+                    {tools
+                        .filter(t => t.isFolder && t.id !== toolToMove?.id)
+                        .map(folder => (
+                        <button 
+                            key={folder.id}
+                            onClick={() => handleMoveConfirm(folder.id)}
+                            className={`w-full flex items-center gap-2 p-2 rounded-md hover:bg-workspace-main transition-colors text-sm ${toolToMove?.parentId === folder.id ? 'text-workspace-accent font-medium bg-workspace-accent/5' : 'text-workspace-text'}`}
+                        >
+                            <Folder className="w-4 h-4 text-workspace-muted" /> {folder.titulo}
+                        </button>
+                    ))}
+                </div>
+           </div>
+        </div>
+      )}
+
     </div>
   );
 };

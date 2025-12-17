@@ -44,23 +44,23 @@ const Notes: React.FC = () => {
   
   const safeDate = (dateInput: any): Date => {
     if (!dateInput) return new Date();
+    // O Supabase retorna UTC string (ex: "2023-10-27T10:00:00+00:00")
+    // O JS converte automaticamente para local no construtor
     const date = new Date(dateInput);
     return isNaN(date.getTime()) ? new Date() : date;
   };
 
   const toFrontend = (data: any): Note => ({
     id: data.id,
-    titulo: data.titulo || data.title || 'Sem Título',
-    conteudo: data.conteudo || data.content || '',
-    criado_em: safeDate(data.criado_em || data.created_at),
-    atualizado_em: safeDate(data.atualizado_em || data.updated_at || data.criado_em || data.created_at)
+    titulo: data.titulo || 'Sem Título',
+    conteudo: data.conteudo || '',
+    criado_em: safeDate(data.criado_em),
+    atualizado_em: safeDate(data.atualizado_em)
   });
 
   // --- Supabase Sync ---
 
   const fetchNotes = async () => {
-    // Prompt: Implementação de Optimistic UI com Supabase (READ/INIT)
-    // Inicialização Híbrida: Tela carrega vazio/mock (se houver) e substitui por dados reais sem bloquear
     setIsSyncing(true);
     try {
       const { data, error } = await supabase
@@ -103,8 +103,6 @@ const Notes: React.FC = () => {
   // --- Actions ---
 
   const handleCreateNote = async () => {
-    // Prompt: Implementação de Optimistic UI com Supabase (CREATE)
-    // Atualiza estado local imediatamente com ID temporário
     const tempId = `temp-${Date.now()}`;
     const newNote: Note = {
       id: tempId,
@@ -118,7 +116,6 @@ const Notes: React.FC = () => {
     setActiveNoteId(tempId);
 
     try {
-      // Sincroniza em background
       const { data, error } = await supabase
         .from('notas')
         .insert([{ titulo: 'Nova Nota', conteudo: '' }])
@@ -126,7 +123,6 @@ const Notes: React.FC = () => {
         .single();
 
       if (data) {
-        // Substitui silenciosamente ID temporário pelo real
         const realNote = toFrontend(data);
         setNotes(current => current.map(n => n.id === tempId ? realNote : n));
         setActiveNoteId(realNote.id);
@@ -135,23 +131,18 @@ const Notes: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
-      // Mantém a nota localmente se der erro, mas avisa no console
     }
   };
 
   const handleDeleteNote = async (id: string) => {
-    // Prompt: Implementação de Optimistic UI com Supabase (DELETE)
-    // Remoção imediata da UI antes da resposta do servidor
     const previousNotes = [...notes];
     const newNotes = notes.filter(n => n.id !== id);
     setNotes(newNotes);
     
-    // Se a nota deletada era a ativa, seleciona a primeira disponível ou null
     if (activeNoteId === id) {
       setActiveNoteId(newNotes.length > 0 ? newNotes[0].id : null);
     }
 
-    // Se for uma nota temporária (não salva no banco), paramos aqui
     if (id.startsWith('temp-')) {
       return;
     }
@@ -164,16 +155,14 @@ const Notes: React.FC = () => {
     } catch (error) {
       console.error('Erro ao excluir:', error);
       alert('Erro ao sincronizar exclusão. A nota pode reaparecer ao recarregar.');
-      setNotes(previousNotes); // Rollback visual em caso de erro real
-      if (activeNoteId === id) setActiveNoteId(id); // Restaura seleção
+      setNotes(previousNotes);
+      if (activeNoteId === id) setActiveNoteId(id);
     }
   };
 
   const updateActiveNote = (updates: Partial<Note>) => {
     if (!activeNoteId) return;
 
-    // Prompt: Implementação de Optimistic UI com Supabase (UPDATE)
-    // Atualização local imediata para responsividade instantânea
     const updatedNotes = notes.map(note => 
       note.id === activeNoteId 
         ? { ...note, ...updates, atualizado_em: new Date() } 
@@ -187,12 +176,15 @@ const Notes: React.FC = () => {
       if (activeNoteId.startsWith('temp-')) return;
       setIsSyncing(true);
       
-      const dbUpdates: any = { ...updates };
-      delete dbUpdates.id; 
-      delete dbUpdates.criado_em; 
+      // Mapeamento para o banco
+      const dbUpdates: any = {};
+      if (updates.titulo !== undefined) dbUpdates.titulo = updates.titulo;
+      if (updates.conteudo !== undefined) dbUpdates.conteudo = updates.conteudo;
       
-      dbUpdates.atualizado_em = new Date().toISOString();
-
+      // Não enviamos 'atualizado_em' manual, pois o trigger moddatetime cuida disso no banco
+      // Mas podemos enviar 'atualizado_em' apenas para garantir se o trigger falhar, 
+      // porém a regra do prompt diz para confiar no trigger. Vamos deixar o trigger trabalhar.
+      
       await supabase
         .from('notas')
         .update(dbUpdates)
