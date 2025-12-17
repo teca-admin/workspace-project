@@ -468,24 +468,6 @@ const Artifacts: React.FC = () => {
                          {artifact.content}
                        </p>
                      </button>
-                     
-                     {/* Hover Actions for List Items - REMOVED BORDER FROM CONTAINER */}
-                     <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-workspace-surface/80 backdrop-blur-sm rounded-md p-0.5 z-10">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); openArtifactModal(artifact); }}
-                          className="p-1 hover:bg-workspace-main hover:text-workspace-text text-workspace-muted rounded transition-colors focus:outline-none"
-                          title="Editar"
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                        <button 
-                          onClick={(e) => handleDeleteArtifact(artifact.id, e)}
-                          className="p-1 hover:bg-red-500/10 hover:text-red-500 text-workspace-muted rounded transition-colors focus:outline-none"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                     </div>
                    </div>
                  );
                  })
@@ -531,6 +513,13 @@ const Artifacts: React.FC = () => {
                  <button onClick={handleCopy} className="flex items-center gap-2 px-3 py-1.5 border border-workspace-border rounded-md hover:bg-workspace-surface transition-colors text-xs text-workspace-muted hover:text-workspace-text focus:outline-none">
                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                    {copied ? 'Copiado' : 'Copiar'}
+                 </button>
+                 <button 
+                   onClick={() => openArtifactModal(activeArtifact)}
+                   className="p-2 hover:bg-workspace-surface hover:text-workspace-text text-workspace-muted rounded-md transition-colors focus:outline-none" 
+                   title="Editar"
+                 >
+                   <Pencil className="w-4 h-4" />
                  </button>
                  <button 
                    onClick={(e) => handleDeleteArtifact(activeArtifact.id, e)}
