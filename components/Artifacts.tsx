@@ -437,6 +437,50 @@ const Artifacts: React.FC = () => {
         </div>
       )}
 
+      {/* 3. COLUNA: DETALHES */}
+      <div className="flex-1 bg-workspace-main flex flex-col h-full overflow-hidden relative">
+        {activeArtifact ? (
+           <>
+             <div className="h-16 border-b border-workspace-border flex items-center justify-between px-8 bg-workspace-main shrink-0">
+               <div className="flex items-center gap-3">
+                 <div className={`p-2 rounded-md transition-colors ${activeArtifact.color && activeArtifact.color !== 'default' ? `border ${getArtifactColor(activeArtifact.color).border} ${getArtifactColor(activeArtifact.color).text} bg-transparent` : 'border-transparent bg-workspace-accent/10'}`}>
+                    {(() => { const CustomIcon = activeArtifact.icon ? getIconComponent(activeArtifact.icon) : null; const DefaultIcon = activeArtifact.type === 'code' ? FileCode : FileText; const IconToRender = CustomIcon || DefaultIcon; return <IconToRender className={`w-5 h-5 ${activeArtifact.color && activeArtifact.color !== 'default' ? '' : 'text-workspace-text'}`} />; })()}
+                 </div>
+                 <div>
+                   <h1 className="text-lg font-light text-workspace-text tracking-tight">{activeArtifact.title}</h1>
+                   <div className="flex items-center gap-2 text-[10px] text-workspace-muted">
+                      <span>{activeArtifact.type === 'code' ? 'Snippet' : 'Texto'}</span>
+                      <span className="w-1 h-1 rounded-full bg-workspace-muted/50" />
+                      <span>{activeArtifact.createdAt.toLocaleDateString()}</span>
+                   </div>
+                 </div>
+               </div>
+               <div className="flex items-center gap-2">
+                 <button onClick={handleCopy} className="flex items-center gap-2 px-3 py-1.5 border border-workspace-border rounded-md hover:bg-workspace-surface transition-colors text-xs text-workspace-muted hover:text-workspace-text">
+                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copiado' : 'Copiar'}
+                 </button>
+                 <button onClick={() => openArtifactModal(activeArtifact)} className="p-2 hover:bg-workspace-surface hover:text-workspace-text text-workspace-muted rounded-md transition-colors"><Pencil className="w-4 h-4" /></button>
+                 <button onClick={(e) => handleDeleteArtifact(activeArtifact.id, e)} className="p-2 hover:bg-red-50 hover:text-red-500 text-workspace-muted rounded-md transition-colors"><Trash2 className="w-4 h-4" /></button>
+               </div>
+             </div>
+             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+               <div className="max-w-3xl mx-auto">
+                 {activeArtifact.type === 'code' ? (
+                   <pre className="bg-workspace-surface border border-workspace-border rounded-lg p-6 overflow-x-auto text-sm font-mono text-workspace-text shadow-sm relative group">
+                      <div className="absolute top-2 right-2 text-[10px] text-workspace-muted opacity-50 uppercase tracking-wider">Snippet</div>
+                      <code>{activeArtifact.content}</code>
+                   </pre>
+                 ) : (
+                   <div className="prose prose-sm dark:prose-invert max-w-none font-light leading-relaxed text-workspace-text whitespace-pre-wrap">{activeArtifact.content}</div>
+                 )}
+               </div>
+             </div>
+           </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-workspace-muted opacity-60"><Box className="w-16 h-16 mb-4 stroke-[1]" /><h3 className="text-lg font-light mb-2">Nenhum Item Selecionado</h3></div>
+        )}
+      </div>
+
       {/* --- MODAL COLEÇÃO --- */}
       {isCollectionModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
@@ -456,21 +500,66 @@ const Artifacts: React.FC = () => {
       {/* --- MODAL ARTEFATO --- */}
       {isArtifactModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-workspace-surface w-full max-w-2xl border border-workspace-border rounded-lg shadow-2xl p-6 relative m-4 max-h-[90vh] flex flex-col">
+          <div className="bg-workspace-surface w-full max-w-lg border border-workspace-border rounded-lg shadow-2xl p-5 relative m-4 max-h-[85vh] flex flex-col">
             <button onClick={() => setIsArtifactModalOpen(false)} className="absolute top-4 right-4 text-workspace-muted hover:text-workspace-text transition-colors"><X className="w-5 h-5" /></button>
-            <h2 className="text-lg font-light text-workspace-text mb-6 flex items-center gap-2 shrink-0">{editingArtifactId ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {editingArtifactId ? 'Editar Item' : 'Novo Item'}</h2>
-            <div className="space-y-5 overflow-y-auto custom-scrollbar pr-2 flex-1">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2"><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Título</label><input type="text" value={artifactForm.title} onChange={(e) => setArtifactForm({...artifactForm, title: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors" placeholder="Ex: Snippet de Python" autoFocus /></div>
-                <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Tipo</label><div className="flex bg-workspace-main border border-workspace-border rounded-md p-1"><button onClick={() => setArtifactForm({...artifactForm, type: 'text'})} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded text-xs font-medium transition-all ${artifactForm.type === 'text' ? 'bg-workspace-surface shadow-sm text-workspace-text' : 'text-workspace-muted hover:text-workspace-text'}`}><FileText className="w-3 h-3" /> Texto</button><button onClick={() => setArtifactForm({...artifactForm, type: 'code'})} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded text-xs font-medium transition-all ${artifactForm.type === 'code' ? 'bg-workspace-surface shadow-sm text-blue-500' : 'text-workspace-muted hover:text-workspace-text'}`}><FileCode className="w-3 h-3" /> Code</button></div></div>
+            <h2 className="text-lg font-light text-workspace-text mb-4 flex items-center gap-2 shrink-0">{editingArtifactId ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {editingArtifactId ? 'Editar Item' : 'Novo Item'}</h2>
+            <div className="space-y-4 overflow-y-auto custom-scrollbar pr-2 flex-1">
+              
+              {/* Row 1: Title and Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Título</label>
+                    <input type="text" value={artifactForm.title} onChange={(e) => setArtifactForm({...artifactForm, title: e.target.value})} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors" placeholder="Ex: Snippet de Python" autoFocus />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Tipo</label>
+                    <div className="flex bg-workspace-main border border-workspace-border rounded-md p-1 h-[38px]">
+                        <button onClick={() => setArtifactForm({...artifactForm, type: 'text'})} className={`flex-1 flex items-center justify-center gap-1.5 rounded text-xs font-medium transition-all ${artifactForm.type === 'text' ? 'bg-workspace-surface shadow-sm text-workspace-text' : 'text-workspace-muted hover:text-workspace-text'}`}><FileText className="w-3.5 h-3.5" /> </button>
+                        <button onClick={() => setArtifactForm({...artifactForm, type: 'code'})} className={`flex-1 flex items-center justify-center gap-1.5 rounded text-xs font-medium transition-all ${artifactForm.type === 'code' ? 'bg-workspace-surface shadow-sm text-blue-500' : 'text-workspace-muted hover:text-workspace-text'}`}><FileCode className="w-3.5 h-3.5" /> </button>
+                    </div>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Ícone</label><div className="relative"><div className="grid grid-cols-6 gap-2 p-2 bg-workspace-main border border-workspace-border rounded-lg max-h-32 overflow-y-auto custom-scrollbar"><button onClick={() => setArtifactForm({...artifactForm, icon: ''})} className={`flex items-center justify-center p-2 rounded-md transition-all ${artifactForm.icon === '' ? 'bg-workspace-surface shadow-sm ring-1 ring-workspace-text/20 text-workspace-text' : 'text-workspace-muted hover:text-workspace-text'}`}><span className="text-[10px] font-mono">--</span></button>{Object.keys(ICON_MAP).map((iconKey) => { const IconComponent = ICON_MAP[iconKey]; const isSelected = artifactForm.icon === iconKey; return (<button key={iconKey} onClick={() => setArtifactForm({...artifactForm, icon: iconKey})} className={`flex items-center justify-center p-2 rounded-md transition-all ${isSelected ? 'bg-workspace-accent text-white shadow-sm' : 'text-workspace-muted hover:bg-workspace-surface hover:text-workspace-text'}`}><IconComponent className="w-4 h-4 stroke-[1.5]" /></button>);})}</div></div></div>
-                 <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Cor</label><div className="flex flex-wrap gap-2 p-3 bg-workspace-main border border-workspace-border rounded-lg min-h-[50px] items-center">{COLOR_OPTIONS.map(color => (<button key={color.id} onClick={() => setArtifactForm({...artifactForm, color: color.id})} className={`w-6 h-6 rounded-full border-2 transition-all ${color.bg} ${artifactForm.color === color.id ? 'ring-2 ring-offset-2 ring-offset-workspace-main ring-workspace-text scale-110' : 'opacity-70 hover:opacity-100 border-transparent'}`} />))}</div></div>
+
+              {/* Row 2: Icon and Color */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                 <div>
+                    <label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Ícone</label>
+                    <div className="relative">
+                        <div className="grid grid-cols-6 gap-1 p-1.5 bg-workspace-main border border-workspace-border rounded-lg max-h-24 overflow-y-auto custom-scrollbar">
+                            <button onClick={() => setArtifactForm({...artifactForm, icon: ''})} className={`flex items-center justify-center p-1.5 rounded-md transition-all ${artifactForm.icon === '' ? 'bg-workspace-surface shadow-sm ring-1 ring-workspace-text/20 text-workspace-text' : 'text-workspace-muted hover:text-workspace-text'}`}><span className="text-[10px] font-mono">--</span></button>
+                            {Object.keys(ICON_MAP).map((iconKey) => { 
+                                const IconComponent = ICON_MAP[iconKey]; 
+                                const isSelected = artifactForm.icon === iconKey; 
+                                return (<button key={iconKey} onClick={() => setArtifactForm({...artifactForm, icon: iconKey})} className={`flex items-center justify-center p-1.5 rounded-md transition-all ${isSelected ? 'bg-workspace-accent text-white shadow-sm' : 'text-workspace-muted hover:bg-workspace-surface hover:text-workspace-text'}`}><IconComponent className="w-3.5 h-3.5 stroke-[1.5]" /></button>);
+                            })}
+                        </div>
+                    </div>
+                 </div>
+                 <div>
+                    <label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Cor</label>
+                    <div className="flex flex-wrap gap-2 p-2 bg-workspace-main border border-workspace-border rounded-lg h-24 content-start overflow-y-auto custom-scrollbar">
+                        {COLOR_OPTIONS.map(color => (
+                            <button key={color.id} onClick={() => setArtifactForm({...artifactForm, color: color.id})} className={`w-5 h-5 rounded-full border-2 transition-all ${color.bg} ${artifactForm.color === color.id ? 'ring-2 ring-offset-2 ring-offset-workspace-main ring-workspace-text scale-110' : 'opacity-70 hover:opacity-100 border-transparent'}`} />
+                        ))}
+                    </div>
+                 </div>
               </div>
-              <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Conteúdo</label><textarea value={artifactForm.content} onChange={(e) => setArtifactForm({...artifactForm, content: e.target.value})} className={`w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-3 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors min-h-[300px] resize-none font-light leading-relaxed ${artifactForm.type === 'code' ? 'font-mono text-xs' : ''}`} placeholder={artifactForm.type === 'code' ? '// Código aqui...' : 'Texto aqui...'} /></div>
+
+              {/* Row 3: Content */}
+              <div>
+                <label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Conteúdo</label>
+                <textarea 
+                    value={artifactForm.content} 
+                    onChange={(e) => setArtifactForm({...artifactForm, content: e.target.value})} 
+                    className={`w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-3 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors min-h-[150px] resize-y font-light leading-relaxed ${artifactForm.type === 'code' ? 'font-mono text-xs' : ''}`} 
+                    placeholder={artifactForm.type === 'code' ? '// Código aqui...' : 'Texto aqui...'} 
+                />
+              </div>
             </div>
-            <div className="mt-8 flex justify-end gap-3 shrink-0 pt-4 border-t border-workspace-border"><button onClick={() => setIsArtifactModalOpen(false)} className="px-4 py-2 text-xs font-medium text-workspace-text hover:bg-workspace-main rounded-md transition-colors">CANCELAR</button><button onClick={handleSaveArtifact} disabled={!artifactForm.title} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"><Save className="w-3 h-3" /> SALVAR</button></div>
+            <div className="mt-6 flex justify-end gap-3 shrink-0 pt-4 border-t border-workspace-border">
+                <button onClick={() => setIsArtifactModalOpen(false)} className="px-4 py-2 text-xs font-medium text-workspace-text hover:bg-workspace-main rounded-md transition-colors">CANCELAR</button>
+                <button onClick={handleSaveArtifact} disabled={!artifactForm.title} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"><Save className="w-3 h-3" /> SALVAR</button>
+            </div>
           </div>
         </div>
       )}
