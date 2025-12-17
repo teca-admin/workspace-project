@@ -75,7 +75,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               className={`
                 flex items-center w-full px-3 py-2 rounded-md transition-all duration-200 group relative focus:outline-none
                 ${isActive 
-                  ? 'bg-workspace-accent text-workspace-text shadow-sm ring-1 ring-white/5' 
+                  ? 'bg-workspace-accent text-white shadow-sm ring-1 ring-white/5' 
                   : 'text-workspace-muted hover:bg-workspace-surface hover:text-workspace-text'
                 }
                 ${isOpen ? 'justify-start' : 'justify-center'}
@@ -84,7 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <item.icon 
                 className={`
                   w-4 h-4 stroke-[1.5] transition-colors shrink-0
-                  ${isActive ? 'text-workspace-text' : 'text-workspace-muted group-hover:text-workspace-text'}
+                  ${isActive ? 'text-white' : 'text-workspace-muted group-hover:text-workspace-text'}
                 `} 
               />
               

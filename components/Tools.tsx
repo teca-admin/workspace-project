@@ -407,7 +407,7 @@ const Tools: React.FC = () => {
             </div>
         </div>
 
-        <div className="flex items-center gap-1 text-sm text-workspace-muted bg-workspace-surface/50 p-2 rounded-md border border-workspace-border/50">
+        <div className="flex items-center gap-1 text-sm text-workspace-muted bg-workspace-surface/50 p-2 rounded-md">
             <button 
                 onClick={() => setCurrentFolderId(null)} 
                 className={`p-1 rounded hover:bg-workspace-surface hover:text-workspace-text flex items-center gap-1 transition-colors ${!currentFolderId ? 'text-workspace-text font-medium' : ''}`}
