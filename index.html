@@ -5,37 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Workspace Minimalista</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
       :root {
-        /* Light Mode Palette (Default) */
-        --bg-main: #F3F4F6;       /* Gray 100 */
-        --bg-surface: #FFFFFF;    /* White */
-        --border-color: #E5E7EB;  /* Gray 200 */
-        --accent: #30403E;        /* Dark Green */
-        --accent-hover: #E2E8F0;  /* Gray 200 */
-        --text-main: #111827;     /* Gray 900 */
-        --text-muted: #6B7280;    /* Gray 500 */
-        --scrollbar-track: #F3F4F6;
-        --scrollbar-thumb: #D1D5DB;
+        /* Light Mode Palette (Clean & Airy) */
+        --bg-main: #ffffff;       
+        --bg-surface: #f4f4f5;    /* Zinc 100 */
+        --border-color: #e4e4e7;  /* Zinc 200 */
+        --accent: #18181b;        /* Zinc 900 (Black for high contrast actions) */
+        --accent-hover: #f4f4f5;  
+        --text-main: #09090b;     
+        --text-muted: #71717a;    
+        --scrollbar-track: #ffffff;
+        --scrollbar-thumb: #e4e4e7;
       }
 
-      /* Dark Mode Override using class selector for higher specificity */
+      /* Dark Mode Override (Deep & Minimalist) */
       .dark {
-        --bg-main: #000208;
-        --bg-surface: #0a0c10;
-        /* Using solid dark gray instead of transparent white to avoid 'white border' look */
-        --border-color: #1F2937; 
-        --accent: #30403E;
-        --accent-hover: rgba(48, 64, 62, 0.2);
-        --text-main: #e5e7eb;
-        --text-muted: #6b7280;
-        --scrollbar-track: #000208;
-        --scrollbar-thumb: #30403E;
+        --bg-main: #09090b;       /* Zinc 950 - Deep black */
+        --bg-surface: #121214;    /* Slightly elevated surface */
+        
+        /* CORREÇÃO DA BORDA: Usando transparência sutil ao invés de cinza sólido para evitar o "efeito branco" */
+        --border-color: rgba(255, 255, 255, 0.06); 
+        
+        --accent: #27272a;        /* Zinc 800 - Subtle active state */
+        --accent-hover: rgba(255, 255, 255, 0.03);
+        --text-main: #fafafa;     /* Zinc 50 */
+        --text-muted: #a1a1aa;    /* Zinc 400 */
+        --scrollbar-track: #09090b;
+        --scrollbar-thumb: #27272a;
       }
 
       html {
-        font-size: 80%; /* Zoom out de 20% */
+        font-size: 85%; /* Ajuste fino para densidade de informação */
       }
 
       html, body {
@@ -47,29 +49,31 @@
         color: var(--text-main);
         overflow: hidden;
         transition: background-color 0.3s ease, color 0.3s ease;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
 
-      /* Global Focus Reset to remove white outlines on click */
+      /* Global Focus Reset */
       *, *:focus, *:active {
         outline: none !important;
         -webkit-tap-highlight-color: transparent;
-        box-shadow: none !important; /* Prevents focus rings implemented via box-shadow */
+        box-shadow: none !important; 
       }
 
-      /* Custom Scrollbar using vars */
+      /* Minimalist Scrollbar */
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
-        background: var(--scrollbar-track); 
+        background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
         background: var(--scrollbar-thumb); 
-        border-radius: 4px;
+        border-radius: 3px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: var(--accent); 
+        background: var(--text-muted); 
       }
     </style>
     <script>
@@ -89,11 +93,11 @@
               }
             },
             animation: {
-              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'fade-in': 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             },
             keyframes: {
               fadeIn: {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '0%': { opacity: '0', transform: 'translateY(5px)' },
                 '100%': { opacity: '1', transform: 'translateY(0)' },
               }
             }
