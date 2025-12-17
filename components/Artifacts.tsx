@@ -437,54 +437,10 @@ const Artifacts: React.FC = () => {
         </div>
       )}
 
-      {/* 3. COLUNA: DETALHES */}
-      <div className="flex-1 bg-workspace-main flex flex-col h-full overflow-hidden relative">
-        {activeArtifact ? (
-           <>
-             <div className="h-16 border-b border-workspace-border flex items-center justify-between px-8 bg-workspace-main shrink-0">
-               <div className="flex items-center gap-3">
-                 <div className={`p-2 rounded-md transition-colors ${activeArtifact.color && activeArtifact.color !== 'default' ? `border ${getArtifactColor(activeArtifact.color).border} ${getArtifactColor(activeArtifact.color).text} bg-transparent` : 'border-transparent bg-workspace-accent/10'}`}>
-                    {(() => { const CustomIcon = activeArtifact.icon ? getIconComponent(activeArtifact.icon) : null; const DefaultIcon = activeArtifact.type === 'code' ? FileCode : FileText; const IconToRender = CustomIcon || DefaultIcon; return <IconToRender className={`w-5 h-5 ${activeArtifact.color && activeArtifact.color !== 'default' ? '' : 'text-workspace-text'}`} />; })()}
-                 </div>
-                 <div>
-                   <h1 className="text-lg font-light text-workspace-text tracking-tight">{activeArtifact.title}</h1>
-                   <div className="flex items-center gap-2 text-[10px] text-workspace-muted">
-                      <span>{activeArtifact.type === 'code' ? 'Snippet' : 'Texto'}</span>
-                      <span className="w-1 h-1 rounded-full bg-workspace-muted/50" />
-                      <span>{activeArtifact.createdAt.toLocaleDateString()}</span>
-                   </div>
-                 </div>
-               </div>
-               <div className="flex items-center gap-2">
-                 <button onClick={handleCopy} className="flex items-center gap-2 px-3 py-1.5 border border-workspace-border rounded-md hover:bg-workspace-surface transition-colors text-xs text-workspace-muted hover:text-workspace-text">
-                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copiado' : 'Copiar'}
-                 </button>
-                 <button onClick={() => openArtifactModal(activeArtifact)} className="p-2 hover:bg-workspace-surface hover:text-workspace-text text-workspace-muted rounded-md transition-colors"><Pencil className="w-4 h-4" /></button>
-                 <button onClick={(e) => handleDeleteArtifact(activeArtifact.id, e)} className="p-2 hover:bg-red-50 hover:text-red-500 text-workspace-muted rounded-md transition-colors"><Trash2 className="w-4 h-4" /></button>
-               </div>
-             </div>
-             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-               <div className="max-w-3xl mx-auto">
-                 {activeArtifact.type === 'code' ? (
-                   <pre className="bg-workspace-surface border border-workspace-border rounded-lg p-6 overflow-x-auto text-sm font-mono text-workspace-text shadow-sm relative group">
-                      <div className="absolute top-2 right-2 text-[10px] text-workspace-muted opacity-50 uppercase tracking-wider">Snippet</div>
-                      <code>{activeArtifact.content}</code>
-                   </pre>
-                 ) : (
-                   <div className="prose prose-sm dark:prose-invert max-w-none font-light leading-relaxed text-workspace-text whitespace-pre-wrap">{activeArtifact.content}</div>
-                 )}
-               </div>
-             </div>
-           </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-workspace-muted opacity-60"><Box className="w-16 h-16 mb-4 stroke-[1]" /><h3 className="text-lg font-light mb-2">Nenhum Item Selecionado</h3></div>
-        )}
-      </div>
-
       {/* --- MODAL COLEÇÃO --- */}
       {isCollectionModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-workspace-surface w-full max-w-md border border-workspace-border rounded-lg shadow-2xl p-6 relative m-4 max-h-[90vh] flex flex-col">
+          <div className="bg-workspace-surface w-full max-w-[22rem] border border-workspace-border rounded-lg shadow-2xl p-5 relative m-4 max-h-[90vh] flex flex-col">
             <button onClick={() => setIsCollectionModalOpen(false)} className="absolute top-4 right-4 text-workspace-muted hover:text-workspace-text transition-colors"><X className="w-5 h-5" /></button>
             <h2 className="text-lg font-light text-workspace-text mb-6 flex items-center gap-2 shrink-0">{editingCollectionId ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {editingCollectionId ? 'Editar Coleção' : 'Nova Coleção'}</h2>
             <div className="space-y-5 overflow-y-auto custom-scrollbar pr-2 flex-1">
