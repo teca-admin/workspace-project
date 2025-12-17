@@ -98,6 +98,23 @@ const Tools: React.FC = () => {
   const [draggedToolId, setDraggedToolId] = useState<string | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
+  // --- Handlers de Interação (Teclado) ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isModalOpen) {
+          handleCloseModal();
+        } else if (isMoveModalOpen) {
+          setIsMoveModalOpen(false);
+        } else if (activeTool) {
+          setActiveTool(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isModalOpen, isMoveModalOpen, activeTool]);
+
   // --- READ (Buscar dados) ---
   const fetchTools = async () => {
     setIsLoading(true);

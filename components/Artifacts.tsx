@@ -102,6 +102,22 @@ const Artifacts: React.FC = () => {
     title: '', content: '', type: 'text' as 'text' | 'code' | 'spell', icon: '', color: 'default'
   });
 
+  // --- Handlers de Interação (Teclado) ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isCollectionModalOpen) {
+          setIsCollectionModalOpen(false);
+        } else if (isArtifactModalOpen) {
+          setIsArtifactModalOpen(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCollectionModalOpen, isArtifactModalOpen]);
+
   const activeCollection = collections.find(c => c.id === selectedCollectionId);
   const activeArtifact = artifacts.find(a => a.id === selectedArtifactId);
   
