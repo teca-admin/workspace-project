@@ -6,7 +6,7 @@ import {
   Kanban, TrendingUp, BarChart2, PieChart, Activity, Sigma, Calculator, Truck, 
   Package, Container, MapPin, ClipboardList, Factory, Plane, Ship, FileSpreadsheet, 
   Presentation, Table, Briefcase, Book, Calendar, Users, Lightbulb, Puzzle, Timer, 
-  Award, Server, Monitor, Settings, Loader2, Upload, FileUp, Download, Eye
+  Award, Server, Monitor, Settings, Loader2, Upload, FileUp, Download, Eye, Maximize2
 } from 'lucide-react';
 import { Artifact, ArtifactCollection } from '../types';
 import { supabase } from '../lib/supabaseClient';
@@ -90,6 +90,8 @@ const Artifacts: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Modais
@@ -113,6 +115,8 @@ const Artifacts: React.FC = () => {
           setIsCollectionModalOpen(false);
         } else if (isArtifactModalOpen) {
           setIsArtifactModalOpen(false);
+        } else if (showPreview) {
+          setShowPreview(false);
         }
       }
 
@@ -130,7 +134,7 @@ const Artifacts: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCollectionModalOpen, isArtifactModalOpen, newColName, artifactForm, selectedCollectionId]);
+  }, [isCollectionModalOpen, isArtifactModalOpen, newColName, artifactForm, selectedCollectionId, showPreview]);
 
   const activeCollection = collections.find(c => c.id === selectedCollectionId);
   const activeArtifact = artifacts.find(a => a.id === selectedArtifactId);
@@ -141,6 +145,38 @@ const Artifacts: React.FC = () => {
      (a.content && a.content.toLowerCase().includes(searchQuery.toLowerCase())) ||
      (a.description && a.description.toLowerCase().includes(searchQuery.toLowerCase())))
   );
+
+  // --- Preview Logic para PDF (Blob URL) ---
+  useEffect(() => {
+    let url = '';
+    if (showPreview && activeArtifact?.type === 'pdf' && activeArtifact.content) {
+      if (activeArtifact.content.startsWith('data:application/pdf;base64,')) {
+        try {
+          const base64Data = activeArtifact.content.split(',')[1];
+          const binaryString = window.atob(base64Data);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], { type: 'application/pdf' });
+          url = URL.createObjectURL(blob);
+          setPreviewUrl(url);
+        } catch (e) {
+          console.error("Failed to create blob from base64", e);
+          setPreviewUrl(activeArtifact.content);
+        }
+      } else {
+        setPreviewUrl(activeArtifact.content);
+      }
+    } else {
+      setPreviewUrl(null);
+    }
+    
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [showPreview, activeArtifact]);
 
   // --- Helpers ---
   const getIconComponent = (iconName: string) => ICON_MAP[iconName] || Folder;
@@ -401,8 +437,8 @@ const Artifacts: React.FC = () => {
   return (
     <div className="flex h-full w-full bg-workspace-main animate-fade-in overflow-hidden relative">
       
-      {/* 1. COLUNA: COLEÇÕES */}
-      <div className="w-64 border-r border-workspace-border flex flex-col bg-workspace-main shrink-0">
+      {/* 1. COLUNA: COLEÇÕES (24%) */}
+      <div className="w-[24%] border-r border-workspace-border flex flex-col bg-workspace-main shrink-0">
         <div className="p-4 h-16 border-b border-workspace-border flex items-center justify-between shrink-0">
           <h2 className="text-xs font-medium text-workspace-muted uppercase tracking-widest flex items-center gap-2">
             {isLoading && <Loader2 className="w-3 h-3 animate-spin" />} <Layers className="w-4 h-4" /> Coleções
@@ -422,7 +458,7 @@ const Artifacts: React.FC = () => {
           {collections.map(collection => {
             const Icon = getIconComponent(collection.icon);
             return (
-              <div key={collection.id} onClick={() => { setSelectedCollectionId(collection.id); setSelectedArtifactId(null); }} className={`relative w-full text-left p-4 flex items-center gap-3 transition-all group cursor-pointer border-b border-workspace-border/50 ${selectedCollectionId === collection.id ? 'bg-workspace-surface' : 'hover:bg-workspace-surface/50'}`}>
+              <div key={collection.id} onClick={() => { setSelectedCollectionId(collection.id); setSelectedArtifactId(null); setShowPreview(false); }} className={`relative w-full text-left p-4 flex items-center gap-3 transition-all group cursor-pointer ${selectedCollectionId === collection.id ? 'bg-workspace-surface' : 'hover:bg-workspace-surface/50'}`}>
                 <div className={`p-2 rounded-md ${selectedCollectionId === collection.id ? 'bg-workspace-accent text-white' : 'bg-workspace-surface text-workspace-muted group-hover:text-workspace-text'}`}><Icon className="w-4 h-4" /></div>
                 <div className="flex-1 min-w-0">
                   <span className={`block text-sm font-semibold truncate ${selectedCollectionId === collection.id ? 'text-workspace-text' : 'text-workspace-text/80'}`}>{collection.name}</span>
@@ -435,9 +471,9 @@ const Artifacts: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. COLUNA: LISTA DE RECURSOS */}
+      {/* 2. COLUNA: LISTA DE RECURSOS (24%) */}
       {selectedCollectionId ? (
-        <div className="w-72 border-r border-workspace-border flex flex-col bg-workspace-surface/30 shrink-0">
+        <div className="w-[24%] border-r border-workspace-border flex flex-col bg-workspace-surface/30 shrink-0">
            <div className="p-4 h-16 border-b border-workspace-border flex items-center justify-between shrink-0">
              <div className="relative w-full">
                 <Search className="absolute left-2 top-2.5 w-3.5 h-3.5 text-workspace-muted" />
@@ -459,8 +495,8 @@ const Artifacts: React.FC = () => {
                     const DefaultIcon = artifact.type === 'code' ? FileCode : FileText;
                     const IconToRender = CustomIcon || DefaultIcon;
                     return (
-                   <div key={artifact.id} className={`relative w-full text-left transition-all group border-b border-workspace-border/50 ${selectedArtifactId === artifact.id ? `bg-workspace-surface` : `bg-transparent hover:bg-workspace-surface/30`}`}>
-                     <button onClick={() => setSelectedArtifactId(artifact.id)} className="w-full p-4 text-left focus:outline-none">
+                   <div key={artifact.id} className={`relative w-full text-left transition-all group ${selectedArtifactId === artifact.id ? `bg-workspace-surface` : `bg-transparent hover:bg-workspace-surface/30`}`}>
+                     <button onClick={() => { setSelectedArtifactId(artifact.id); setShowPreview(false); }} className="w-full p-4 text-left focus:outline-none">
                        <div className="flex items-center gap-2 mb-1.5">
                           <IconToRender className={`w-3.5 h-3.5 shrink-0 ${artifact.color && artifact.color !== 'default' ? colorData.text : (artifact.type === 'code' ? 'text-blue-500' : 'text-amber-500')}`} />
                           <span className={`text-sm font-semibold line-clamp-1 ${selectedArtifactId === artifact.id ? 'text-workspace-text' : 'text-workspace-text/80'}`}>{artifact.title}</span>
@@ -476,13 +512,13 @@ const Artifacts: React.FC = () => {
            </div>
         </div>
       ) : (
-        <div className="w-72 border-r border-workspace-border bg-workspace-surface/30 flex items-center justify-center text-workspace-muted flex-col p-6 text-center">
+        <div className="w-[24%] border-r border-workspace-border bg-workspace-surface/30 flex items-center justify-center text-workspace-muted flex-col p-6 text-center shrink-0">
             <Folder className="w-8 h-8 mb-3 opacity-20" />
             <p className="text-xs">Selecione uma coleção.</p>
         </div>
       )}
 
-      {/* 3. COLUNA: DETALHES */}
+      {/* 3. COLUNA: DETALHES (52%) */}
       <div className="flex-1 bg-workspace-main flex flex-col h-full overflow-hidden relative">
         {activeArtifact ? (
            <>
@@ -501,6 +537,11 @@ const Artifacts: React.FC = () => {
                  </div>
                </div>
                <div className="flex items-center gap-2">
+                 {['pdf', 'word', 'excel', 'powerpoint'].includes(activeArtifact.type) && (
+                    <button onClick={() => setShowPreview(!showPreview)} className={`flex items-center gap-2 px-3 py-1.5 border border-workspace-border rounded-md transition-colors text-xs font-medium ${showPreview ? 'bg-workspace-accent text-white' : 'text-workspace-muted hover:text-workspace-text hover:bg-workspace-surface'}`}>
+                        {showPreview ? <Eye className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />} {showPreview ? 'Ocultar Prévia' : 'Pré-visualizar'}
+                    </button>
+                 )}
                  {['pdf', 'word', 'excel', 'powerpoint'].includes(activeArtifact.type) ? (
                     <button onClick={handleDownload} className="flex items-center gap-2 px-3 py-1.5 bg-workspace-accent hover:opacity-90 text-white rounded-md transition-colors text-xs font-medium">
                         <Download className="w-3.5 h-3.5" /> Baixar
@@ -517,19 +558,37 @@ const Artifacts: React.FC = () => {
              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                <div className="max-w-3xl mx-auto space-y-6">
                  
-                 {/* Visualização de Documento Anexo */}
+                 {/* Visualização de Documento Anexo Compacta */}
                  {['pdf', 'word', 'excel', 'powerpoint'].includes(activeArtifact.type) && (
-                    <div className="flex items-center gap-4 p-4 bg-workspace-surface border border-workspace-border rounded-lg shadow-sm">
-                        <div className="w-12 h-12 bg-workspace-main rounded-md flex items-center justify-center border border-workspace-border">
-                            {(() => { const Icon = getIconComponent(activeArtifact.icon || 'folder'); return <Icon className="w-6 h-6 text-workspace-accent" />; })()}
+                    <div 
+                      onClick={() => setShowPreview(!showPreview)}
+                      className={`flex items-center gap-4 p-3 bg-workspace-surface border border-workspace-border rounded-lg shadow-sm cursor-pointer transition-all hover:border-workspace-accent group`}
+                    >
+                        <div className="w-10 h-10 bg-workspace-main rounded-md flex items-center justify-center border border-workspace-border group-hover:bg-workspace-accent/5">
+                            {(() => { const Icon = getIconComponent(activeArtifact.icon || 'folder'); return <Icon className="w-5 h-5 text-workspace-accent" />; })()}
                         </div>
                         <div className="flex-1 min-w-0">
                             <h3 className="text-sm font-semibold text-workspace-text truncate">{activeArtifact.title}</h3>
-                            <p className="text-[10px] text-workspace-muted uppercase tracking-wider font-medium">{activeArtifact.type} - {activeArtifact.createdAt.toLocaleDateString()}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-[10px] text-workspace-muted uppercase tracking-wider font-medium">{activeArtifact.type}</p>
+                                <span className="w-1 h-1 rounded-full bg-workspace-muted/30" />
+                                <p className="text-[10px] text-workspace-muted font-medium">{activeArtifact.createdAt.toLocaleDateString()}</p>
+                            </div>
                         </div>
-                        <button onClick={handleDownload} className="p-2 hover:bg-workspace-accent hover:text-white rounded-md transition-all text-workspace-muted" title="Baixar">
-                            <Download className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                           {activeArtifact.type === 'pdf' && <Eye className={`w-3.5 h-3.5 transition-colors ${showPreview ? 'text-workspace-accent' : 'text-workspace-muted group-hover:text-workspace-accent'}`} />}
+                           <Download className="w-3.5 h-3.5 text-workspace-muted hover:text-workspace-text" onClick={(e) => { e.stopPropagation(); handleDownload(); }} />
+                        </div>
+                    </div>
+                 )}
+
+                 {/* Área de Pré-visualização para PDF */}
+                 {showPreview && activeArtifact.type === 'pdf' && previewUrl && (
+                    <div className="animate-fade-in border border-workspace-border rounded-lg overflow-hidden h-[700px] bg-[#1a1a1e] relative">
+                        <div className="absolute top-2 right-4 z-20 flex gap-2">
+                            <button onClick={(e) => { e.stopPropagation(); setShowPreview(false); }} className="p-1.5 bg-black/40 hover:bg-black/60 rounded-full text-white/70 transition-colors"><X className="w-4 h-4" /></button>
+                        </div>
+                        <iframe src={previewUrl} className="w-full h-full border-none" title="PDF Preview" />
                     </div>
                  )}
 

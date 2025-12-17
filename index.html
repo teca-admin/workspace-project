@@ -27,11 +27,11 @@
         --bg-main: #09090b;       /* Zinc 950 - Deep black */
         --bg-surface: #121214;    /* Slightly elevated surface */
         
-        /* CORREÇÃO DA BORDA: Usando transparência sutil ao invés de cinza sólido para evitar o "efeito branco" */
-        --border-color: rgba(255, 255, 255, 0.06); 
+        /* BORDA CORRIGIDA: Removido o branco com opacidade, usando cinza ultra-escuro sólido */
+        --border-color: #1a1a1e;  
         
         --accent: #27272a;        /* Zinc 800 - Subtle active state */
-        --accent-hover: rgba(255, 255, 255, 0.03);
+        --accent-hover: rgba(255, 255, 255, 0.01);
         --text-main: #fafafa;     /* Zinc 50 */
         --text-muted: #a1a1aa;    /* Zinc 400 */
         --scrollbar-track: #09090b;
@@ -39,7 +39,7 @@
       }
 
       html {
-        font-size: 75%; /* Ajustado para 75% (aumento de ~10% sobre 68%) */
+        font-size: 75%; /* Ajustado para 75% */
       }
 
       html, body {
