@@ -124,7 +124,6 @@ const Notes: React.FC = () => {
 
   // CREATE
   const handleCreateNote = async () => {
-    // 1. Atualizar estado local IMEDIATAMENTE
     const tempId = `temp-${Date.now()}`;
     const newNote: Note = {
       id: tempId,
@@ -137,7 +136,6 @@ const Notes: React.FC = () => {
     setNotes(prev => [newNote, ...prev]);
     setActiveNoteId(tempId);
 
-    // 2. Enviar para Supabase em paralelo
     try {
       const { data, error } = await supabase
         .from('notas')
@@ -147,7 +145,6 @@ const Notes: React.FC = () => {
 
       if (error) throw error;
 
-      // 3. Substituir temporário pelo real
       if (data) {
         const realNote = toFrontend(data);
         setNotes(current => current.map(n => n.id === tempId ? realNote : n));
@@ -156,7 +153,6 @@ const Notes: React.FC = () => {
       }
     } catch (e) {
       console.error('[SUPABASE] ❌ Erro ao criar:', formatError(e));
-      // Reverter estado
       setNotes(prev => prev.filter(n => n.id !== tempId));
       if (activeNoteId === tempId) setActiveNoteId(null);
       alert(`Erro ao criar nota: ${formatError(e)}`);
@@ -165,27 +161,19 @@ const Notes: React.FC = () => {
 
   // DELETE
   const handleDeleteNote = async (id: string) => {
-    // 1. Guardar item para possível restauração
     const noteRemovida = notes.find(n => n.id === id);
     const newNotes = notes.filter(n => n.id !== id);
-
-    // 2. Remover local IMEDIATAMENTE
     setNotes(newNotes);
-    
     if (activeNoteId === id) {
       setActiveNoteId(newNotes.length > 0 ? newNotes[0].id : null);
     }
-
     if (id.startsWith('temp-')) return;
-
-    // 3. Enviar para Supabase
     try {
       const { error } = await supabase.from('notas').delete().eq('id', id);
       if (error) throw error;
       console.log('[SUPABASE] ✅ Nota excluída');
     } catch (error) {
       console.error('[SUPABASE] ❌ Erro ao excluir:', formatError(error));
-      // Restaurar
       setNotes(prev => noteRemovida ? [noteRemovida, ...prev] : prev);
       if (activeNoteId === id) setActiveNoteId(id);
       alert(`Erro ao excluir nota: ${formatError(error)}`);
@@ -195,22 +183,16 @@ const Notes: React.FC = () => {
   // UPDATE (Optimistic with Debounce)
   const updateActiveNote = (updates: Partial<Note>) => {
     if (!activeNoteId) return;
-
-    // 1. Atualizar local IMEDIATAMENTE
     const updatedNotes = notes.map(note => 
       note.id === activeNoteId 
         ? { ...note, ...updates, updatedAt: new Date() } 
         : note
     );
     setNotes(updatedNotes);
-
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-
     saveTimeoutRef.current = setTimeout(async () => {
       if (activeNoteId.startsWith('temp-')) return;
       setIsSyncing(true);
-      
-      // 2. Enviar para Supabase
       try {
         const noteToUpdate = updatedNotes.find(n => n.id === activeNoteId);
         if (noteToUpdate) {
@@ -218,7 +200,6 @@ const Notes: React.FC = () => {
                 .from('notas')
                 .update(toSupabase(noteToUpdate))
                 .eq('id', activeNoteId);
-            
             if (error) throw error;
             console.log('[SUPABASE] ✅ Nota atualizada');
         }
@@ -267,8 +248,18 @@ const Notes: React.FC = () => {
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (showLinkInput) {
+        // Confirmar link com Enter ou Ctrl+Enter
         if (e.key === 'Enter') { e.preventDefault(); confirmLinkInput(); }
         if (e.key === 'Escape') { e.preventDefault(); cancelLinkInput(); }
+    } else {
+        // Atalho Ctrl+Enter para ações contextuais se necessário futuramente, 
+        // ou apenas para forçar sincronização se houver demanda.
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          // No editor de notas, apenas focamos o editor se não estiver focado
+          if (document.activeElement !== contentEditableRef.current) {
+              contentEditableRef.current?.focus();
+          }
+        }
     }
   };
 
@@ -371,7 +362,7 @@ const Notes: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {filteredNotes.length === 0 ? (
              <div className="flex flex-col items-center justify-center h-40 text-workspace-muted opacity-60">
                 <PenLine className="w-8 h-8 mb-2 stroke-[1]" />
@@ -379,15 +370,18 @@ const Notes: React.FC = () => {
              </div>
           ) : (
             filteredNotes.map(note => (
-              <div key={note.id} className={`group relative rounded-lg border transition-all duration-200 ${activeNoteId === note.id ? 'bg-workspace-surface border-transparent shadow-sm' : 'bg-transparent border-transparent hover:bg-workspace-surface hover:border-workspace-border'}`}>
-                <div onClick={() => setActiveNoteId(note.id)} className="p-3 cursor-pointer w-full select-none">
-                    <div className="flex justify-between items-start mb-1">
-                        <h3 className={`text-sm font-medium truncate pr-8 ${activeNoteId === note.id ? 'text-workspace-text' : 'text-workspace-text/80'}`}>{note.title || 'Sem Título'}</h3>
+              <div key={note.id} className={`group relative border-b border-workspace-border transition-all duration-200 ${activeNoteId === note.id ? 'bg-workspace-surface' : 'bg-transparent hover:bg-workspace-surface/50'}`}>
+                <div onClick={() => setActiveNoteId(note.id)} className="p-4 cursor-pointer w-full select-none">
+                    <div className="flex justify-between items-start mb-1.5">
+                        <h3 className={`text-sm font-semibold truncate pr-8 ${activeNoteId === note.id ? 'text-workspace-text' : 'text-workspace-text/90'}`}>{note.title || 'Sem Título'}</h3>
                     </div>
-                    <div className="text-xs text-workspace-muted line-clamp-2 h-8 overflow-hidden font-light" dangerouslySetInnerHTML={{ __html: (note.content || '').replace(/<[^>]+>/g, ' ') || 'Sem conteúdo...' }} />
-                    <span className="text-[10px] text-workspace-muted/60 mt-2 block font-mono">
-                        {note.updatedAt instanceof Date && !isNaN(note.updatedAt.getTime()) ? note.updatedAt.toLocaleDateString() : 'Data inválida'}
-                    </span>
+                    <div className="text-xs text-workspace-muted line-clamp-2 h-8 overflow-hidden font-light leading-relaxed" dangerouslySetInnerHTML={{ __html: (note.content || '').replace(/<[^>]+>/g, ' ') || 'Sem conteúdo...' }} />
+                    <div className="flex items-center justify-between mt-3">
+                        <span className="text-[10px] text-workspace-muted font-medium opacity-60">
+                            {note.updatedAt instanceof Date && !isNaN(note.updatedAt.getTime()) ? note.updatedAt.toLocaleDateString('pt-BR') : 'Data inválida'}
+                        </span>
+                        {activeNoteId === note.id && <div className="w-1.5 h-1.5 rounded-full bg-workspace-accent" />}
+                    </div>
                 </div>
                 <button 
                   onClick={(e) => {
@@ -395,11 +389,8 @@ const Notes: React.FC = () => {
                     e.stopPropagation();
                     handleDeleteNote(note.id);
                   }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onMouseUp={(e) => e.stopPropagation()}
-                  className="absolute top-2 right-2 z-50 p-2 rounded-md text-workspace-muted hover:text-white hover:bg-red-500 bg-workspace-surface hover:border-red-500 border border-transparent shadow-sm transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer"
+                  className="absolute top-4 right-4 z-10 p-1.5 rounded-md text-workspace-muted hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer"
                   title="Excluir nota"
-                  type="button"
                 >
                     <Trash2 className="w-4 h-4 pointer-events-none" />
                 </button>
@@ -417,8 +408,8 @@ const Notes: React.FC = () => {
                <div className="flex items-center gap-2 w-full animate-fade-in">
                  <span className="text-xs font-medium text-workspace-muted uppercase tracking-wider min-w-[60px]">URL:</span>
                  <input autoFocus type="text" value={linkValue} onChange={(e) => setLinkValue(e.target.value)} onKeyDown={handleKeyDown} placeholder="Cole seu link aqui..." className="flex-1 bg-workspace-surface border border-workspace-border rounded px-2 py-1 text-sm text-workspace-text focus:border-workspace-accent focus:outline-none" />
-                 <button onClick={confirmLinkInput} className="p-1 text-emerald-500 hover:bg-workspace-surface rounded"><Check className="w-4 h-4" /></button>
-                 <button onClick={cancelLinkInput} className="p-1 text-red-500 hover:bg-workspace-surface rounded"><X className="w-4 h-4" /></button>
+                 <button onClick={confirmLinkInput} className="p-1 text-emerald-500 hover:bg-workspace-surface rounded" title="Enter para confirmar"><Check className="w-4 h-4" /></button>
+                 <button onClick={cancelLinkInput} className="p-1 text-red-500 hover:bg-workspace-surface rounded" title="Esc para cancelar"><X className="w-4 h-4" /></button>
                </div>
              ) : selectedElement?.tagName === 'IMG' ? (
                 <div className="flex items-center gap-2 w-full animate-fade-in">
@@ -456,14 +447,14 @@ const Notes: React.FC = () => {
              )}
           </div>
           <div className="px-8 pt-8 pb-4">
-            <input type="text" value={activeNote.title} onChange={(e) => updateActiveNote({ title: e.target.value })} className="w-full text-3xl font-light text-workspace-text bg-transparent border-none outline-none placeholder-workspace-muted/40" placeholder="Título da Nota" />
+            <input type="text" value={activeNote.title} onChange={(e) => updateActiveNote({ title: e.target.value })} onKeyDown={handleKeyDown} className="w-full text-3xl font-light text-workspace-text bg-transparent border-none outline-none placeholder-workspace-muted/40" placeholder="Título da Nota" />
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar px-8 pb-12 cursor-text" onClick={() => { if (document.activeElement !== contentEditableRef.current && !showLinkInput && !selectedElement) contentEditableRef.current?.focus(); }}>
             <div ref={contentEditableRef} className={`w-full h-full outline-none text-workspace-text text-base leading-relaxed font-light prose prose-sm dark:prose-invert max-w-none ${selectedElement?.tagName === 'IMG' ? 'selection:bg-transparent' : ''}`} contentEditable onInput={(e) => updateActiveNote({ content: e.currentTarget.innerHTML })} onKeyDown={handleKeyDown} onKeyUp={saveSelection} onMouseUp={saveSelection} onClick={handleEditorClick} suppressContentEditableWarning={true} style={{ minHeight: '50vh' }} data-placeholder="Comece a escrever aqui..." />
           </div>
           <div className="px-6 py-2 border-t border-workspace-border text-[10px] text-workspace-muted flex justify-between items-center bg-workspace-main">
               <div className="flex gap-4">
-                <span>{(activeNote.content || '').replace(/<[^>]*>/g, '').length} caracteres</span>
+                <span>{(activeNote.content || '').replace(/<[^]*>/g, '').length} caracteres</span>
                 {isSyncing ? <span className="text-workspace-accent animate-pulse">Salvando...</span> : <span>Salvo</span>}
               </div>
               <span>Última edição: {activeNote.updatedAt instanceof Date && !isNaN(activeNote.updatedAt.getTime()) ? activeNote.updatedAt.toLocaleTimeString() : '--:--'}</span>

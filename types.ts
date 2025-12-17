@@ -55,7 +55,8 @@ export interface Artifact {
   collectionId: string; // Frontend: collectionId, DB: colecao_id
   title: string;        // Frontend: title, DB: titulo
   content: string;      // Frontend: content, DB: conteudo
-  type: 'code' | 'text' | 'spell'; // Frontend: type, DB: tipo
+  description?: string; // Frontend: description, DB: descricao
+  type: 'code' | 'text' | 'spell' | 'pdf' | 'word' | 'excel' | 'powerpoint'; // Frontend: type, DB: tipo
   createdAt: Date;      // Frontend: createdAt, DB: criado_em
   icon?: string;        // Frontend: icon, DB: icone
   color?: string;       // Frontend: color, DB: cor

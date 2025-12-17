@@ -98,6 +98,8 @@ const Tools: React.FC = () => {
   const [draggedToolId, setDraggedToolId] = useState<string | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
+  const canSave = formData.title && (formData.isFolder || formData.url);
+
   // --- Handlers de Interação (Teclado) ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -110,10 +112,18 @@ const Tools: React.FC = () => {
           setActiveTool(null);
         }
       }
+      
+      // Atalho Ctrl+Enter ou Cmd+Enter para salvar
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (isModalOpen && canSave) {
+          e.preventDefault();
+          handleSave();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isModalOpen, isMoveModalOpen, activeTool]);
+  }, [isModalOpen, isMoveModalOpen, activeTool, formData]);
 
   // --- READ (Buscar dados) ---
   const fetchTools = async () => {
@@ -127,7 +137,6 @@ const Tools: React.FC = () => {
         console.log('[SUPABASE] ✅ Dados sincronizados');
       }
     } catch (e) {
-      // Apenas loga erro de fetch, não alerta para não bloquear a UI na carga
       console.error('[SUPABASE] ❌ Erro ao buscar:', formatError(e));
     } finally {
       setIsLoading(false);
@@ -153,7 +162,6 @@ const Tools: React.FC = () => {
   };
 
   // --- Navegação de Pastas ---
-  
   const getBreadcrumbs = () => {
     const path = [];
     let currentId = currentFolderId;
@@ -170,7 +178,6 @@ const Tools: React.FC = () => {
   };
 
   // --- CRUD Actions (Optimistic UI) ---
-
   const handleOpenModal = (tool?: Tool, createFolder: boolean = false) => {
     if (tool) {
       setEditingToolId(tool.id);
@@ -198,24 +205,16 @@ const Tools: React.FC = () => {
     setFormData({ title: '', url: '', description: '', isFolder: false });
   };
 
-  // DELETE
   const handleDelete = async (id: string) => {
-    // 1. Guardar item para possível restauração
     const itemRemovido = tools.find(item => item.id === id);
     const filhosRemovidos = tools.filter(item => item.parentId === id);
-    
-    // 2. Remover local IMEDIATAMENTE
     setTools(prev => prev.filter(t => t.id !== id && t.parentId !== id)); 
-    
     if (id.startsWith('temp-')) return;
-
-    // 3. Enviar para Supabase
     try {
       const { error } = await supabase.from('ferramentas').delete().eq('id', id);
       if (error) throw error;
       console.log('[SUPABASE] ✅ Item removido');
     } catch (error) {
-      // Restaurar item
       setTools(prev => [...prev, itemRemovido!, ...filhosRemovidos]);
       alertError(error, 'excluir');
     }
@@ -246,77 +245,55 @@ const Tools: React.FC = () => {
     };
 
     if (editingToolId) {
-      // UPDATE
-      // 1. Atualizar local IMEDIATAMENTE
       setTools(prev => prev.map(t => t.id === editingToolId ? { ...t, ...toolData } : t));
       handleCloseModal();
-
-      // 2. Enviar para Supabase
       try {
          const { error } = await supabase.from('ferramentas').update(toSupabase(toolData)).eq('id', editingToolId);
          if (error) throw error;
          console.log('[SUPABASE] ✅ Item atualizado');
       } catch (error) {
-         fetchTools(); // Revert/Refetch
+         fetchTools();
          alertError(error, 'atualizar');
       }
-
     } else {
-      // CREATE
-      // 1. Atualizar estado local IMEDIATAMENTE
       const tempId = `temp-${Date.now()}`;
       const optimisticTool: Tool = {
           id: tempId,
           ...toolData
       } as Tool;
-
       setTools(prev => [optimisticTool, ...prev]);
       handleCloseModal();
-
-      // 2. Enviar para Supabase
       try {
         const { data, error } = await supabase
             .from('ferramentas')
             .insert(toSupabase(toolData))
             .select()
             .single();
-
         if (error) throw error;
-
-        // 3. Substituir temporário pelo real
         setTools(prev => prev.map(t => t.id === tempId ? toFrontend(data) : t));
         console.log('[SUPABASE] ✅ Item adicionado');
       } catch (error) {
-        // Reverter estado
         setTools(prev => prev.filter(t => t.id !== tempId));
         alertError(error, 'adicionar');
       }
     }
   };
 
-  // --- Move Logic (Optimistic UI) ---
-
   const moveTool = async (toolId: string, targetFolderId: string | null) => {
-      // 1. Atualizar local IMEDIATAMENTE
       const previousTools = [...tools];
       setTools(prev => prev.map(t => t.id === toolId ? { ...t, parentId: targetFolderId } : t));
-      
-      // 2. Enviar para Supabase
       try {
           const { error } = await supabase
             .from('ferramentas')
             .update({ parent_id: targetFolderId })
             .eq('id', toolId);
-            
           if (error) throw error;
           console.log('[SUPABASE] ✅ Item movido');
       } catch (err) {
-          setTools(previousTools); // Revert
+          setTools(previousTools);
           alertError(err, 'mover');
       }
   };
-
-  // --- Drag and Drop ---
 
   const handleDragStart = (e: React.DragEvent, toolId: string) => {
       setDraggedToolId(toolId);
@@ -339,7 +316,6 @@ const Tools: React.FC = () => {
       e.preventDefault();
       setDragOverFolderId(null);
       const toolId = e.dataTransfer.getData("toolId");
-      
       if (toolId && toolId !== targetFolderId) {
           await moveTool(toolId, targetFolderId);
       }
@@ -544,7 +520,7 @@ const Tools: React.FC = () => {
             </div>
             <div className="mt-8 flex justify-end gap-3">
               <button onClick={handleCloseModal} className="px-4 py-2 text-xs font-medium text-workspace-text hover:bg-workspace-main rounded-md transition-colors">CANCELAR</button>
-              <button onClick={handleSave} disabled={!formData.title || (!formData.isFolder && !formData.url)} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"><Save className="w-3 h-3" /> SALVAR</button>
+              <button onClick={handleSave} disabled={!canSave} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" title="Ctrl+Enter para salvar"><Save className="w-3 h-3" /> SALVAR</button>
             </div>
           </div>
         </div>

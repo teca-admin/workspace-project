@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Folder, FileCode, FileText, Plus, Search, ChevronRight, Box, Terminal, Layers, 
   Trash2, Copy, Check, Archive, X, Database, Cloud, Shield, Smartphone, Cpu, Globe, 
@@ -6,7 +6,7 @@ import {
   Kanban, TrendingUp, BarChart2, PieChart, Activity, Sigma, Calculator, Truck, 
   Package, Container, MapPin, ClipboardList, Factory, Plane, Ship, FileSpreadsheet, 
   Presentation, Table, Briefcase, Book, Calendar, Users, Lightbulb, Puzzle, Timer, 
-  Award, Server, Monitor, Settings, Loader2 
+  Award, Server, Monitor, Settings, Loader2, Upload, FileUp, Download, Eye
 } from 'lucide-react';
 import { Artifact, ArtifactCollection } from '../types';
 import { supabase } from '../lib/supabaseClient';
@@ -33,6 +33,7 @@ const toSupabaseArt = (art: Partial<Artifact>) => ({
   colecao_id: art.collectionId,
   titulo: art.title,
   conteudo: art.content,
+  descricao: art.description,
   tipo: art.type,
   icone: art.icon,
   cor: art.color
@@ -44,6 +45,7 @@ const toFrontendArt = (data: any): Artifact => ({
   collectionId: data.colecao_id, 
   title: data.titulo, 
   content: data.conteudo, 
+  description: data.descricao,
   type: data.tipo, 
   createdAt: new Date(data.criado_em), 
   icon: data.icone, 
@@ -66,7 +68,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'lightbulb': Lightbulb, 'puzzle': Puzzle, 'timer': Timer, 'award': Award, 'truck': Truck,
   'plane': Plane, 'ship': Ship, 'package': Package, 'container': Container, 'factory': Factory,
   'location': MapPin, 'checklist': ClipboardList, 'excel': FileSpreadsheet, 'word': FileText,
-  'ppt': Presentation, 'calc': Calculator, 'table': Table, 'book': Book,
+  'pdf': FileText, 'ppt': Presentation, 'calc': Calculator, 'table': Table, 'book': Book,
 };
 
 const COLOR_OPTIONS = [
@@ -88,6 +90,7 @@ const Artifacts: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Modais
   const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
@@ -99,7 +102,7 @@ const Artifacts: React.FC = () => {
   const [isArtifactModalOpen, setIsArtifactModalOpen] = useState(false);
   const [editingArtifactId, setEditingArtifactId] = useState<string | null>(null);
   const [artifactForm, setArtifactForm] = useState({
-    title: '', content: '', type: 'text' as 'text' | 'code' | 'spell', icon: '', color: 'default'
+    title: '', content: '', description: '', type: 'text' as Artifact['type'], icon: '', color: 'default'
   });
 
   // --- Handlers de Interação (Teclado) ---
@@ -112,11 +115,22 @@ const Artifacts: React.FC = () => {
           setIsArtifactModalOpen(false);
         }
       }
+
+      // Atalho Ctrl+Enter ou Cmd+Enter para salvar
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (isCollectionModalOpen && newColName.trim()) {
+          e.preventDefault();
+          handleSaveCollection();
+        } else if (isArtifactModalOpen && artifactForm.title.trim() && selectedCollectionId) {
+          e.preventDefault();
+          handleSaveArtifact();
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCollectionModalOpen, isArtifactModalOpen]);
+  }, [isCollectionModalOpen, isArtifactModalOpen, newColName, artifactForm, selectedCollectionId]);
 
   const activeCollection = collections.find(c => c.id === selectedCollectionId);
   const activeArtifact = artifacts.find(a => a.id === selectedArtifactId);
@@ -124,7 +138,8 @@ const Artifacts: React.FC = () => {
   const filteredArtifacts = artifacts.filter(a => 
     a.collectionId === selectedCollectionId && 
     (a.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-     a.content.toLowerCase().includes(searchQuery.toLowerCase()))
+     (a.content && a.content.toLowerCase().includes(searchQuery.toLowerCase())) ||
+     (a.description && a.description.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
   // --- Helpers ---
@@ -136,6 +151,17 @@ const Artifacts: React.FC = () => {
       navigator.clipboard.writeText(activeArtifact.content);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleDownload = () => {
+    if (activeArtifact && ['pdf', 'word', 'excel', 'powerpoint'].includes(activeArtifact.type)) {
+      const link = document.createElement('a');
+      link.href = activeArtifact.content;
+      link.download = activeArtifact.title;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
@@ -194,41 +220,32 @@ const Artifacts: React.FC = () => {
     };
 
     if (editingCollectionId) {
-        // UPDATE
-        // 1. Atualizar local IMEDIATAMENTE
         setCollections(c => c.map(item => item.id === editingCollectionId ? { ...item, ...colData } as ArtifactCollection : item));
         setIsCollectionModalOpen(false);
 
-        // 2. Enviar para Supabase
         try {
             const { error } = await supabase.from('colecoes').update(toSupabaseCol(colData)).eq('id', editingCollectionId);
             if (error) throw error;
             console.log('[SUPABASE] ✅ Coleção atualizada');
         } catch (error) {
             console.error('[SUPABASE] ❌ Erro:', formatError(error));
-            fetchData(); // Revert
+            fetchData(); 
             alert(`Erro ao atualizar coleção: ${formatError(error)}`);
         }
-
     } else {
-        // CREATE
-        // 1. Atualizar local IMEDIATAMENTE
         const tempId = `temp-${Date.now()}`;
         const newCol = { id: tempId, ...colData } as ArtifactCollection;
         setCollections(prev => [...prev, newCol]);
         setIsCollectionModalOpen(false);
 
-        // 2. Enviar para Supabase
         try {
             const { data, error } = await supabase.from('colecoes').insert([toSupabaseCol(colData)]).select().single();
             if (error) throw error;
-            
-            // 3. Substituir
             setCollections(c => c.map(item => item.id === tempId ? toFrontendCol(data) : item));
             console.log('[SUPABASE] ✅ Coleção criada');
         } catch (error) {
             console.error('[SUPABASE] ❌ Erro:', formatError(error));
-            setCollections(prev => prev.filter(c => c.id !== tempId)); // Revert
+            setCollections(prev => prev.filter(c => c.id !== tempId));
             alert(`Erro ao criar coleção: ${formatError(error)}`);
         }
     }
@@ -238,23 +255,19 @@ const Artifacts: React.FC = () => {
     e?.stopPropagation();
     if (!window.confirm("Excluir esta coleção e todos os seus itens?")) return;
 
-    // 1. Guardar para restaurar
     const colRemoved = collections.find(c => c.id === id);
     const artsRemoved = artifacts.filter(a => a.collectionId === id);
 
-    // 2. Remover local IMEDIATAMENTE
     setCollections(collections.filter(c => c.id !== id));
     setArtifacts(artifacts.filter(a => a.collectionId !== id));
     if (selectedCollectionId === id) { setSelectedCollectionId(null); setSelectedArtifactId(null); }
 
-    // 3. Enviar para Supabase
     try {
         const { error } = await supabase.from('colecoes').delete().eq('id', id);
         if (error) throw error;
         console.log('[SUPABASE] ✅ Coleção excluída');
     } catch (error) {
         console.error('[SUPABASE] ❌ Erro:', formatError(error));
-        // Restore
         if (colRemoved) setCollections(prev => [...prev, colRemoved]);
         if (artsRemoved.length) setArtifacts(prev => [...prev, ...artsRemoved]);
         alert(`Erro ao excluir: ${formatError(error)}`);
@@ -265,12 +278,54 @@ const Artifacts: React.FC = () => {
   const openArtifactModal = (artifact?: Artifact) => {
     if (artifact) {
       setEditingArtifactId(artifact.id);
-      setArtifactForm({ title: artifact.title, content: artifact.content, type: artifact.type, icon: artifact.icon || '', color: artifact.color || 'default' });
+      setArtifactForm({ 
+        title: artifact.title, 
+        content: artifact.content, 
+        description: artifact.description || '',
+        type: artifact.type, 
+        icon: artifact.icon || '', 
+        color: artifact.color || 'default' 
+      });
     } else {
       setEditingArtifactId(null);
-      setArtifactForm({ title: '', content: '', type: 'text', icon: '', color: 'default' });
+      setArtifactForm({ title: '', content: '', description: '', type: 'text', icon: '', color: 'default' });
     }
     setIsArtifactModalOpen(true);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const content = event.target?.result as string;
+        let type: Artifact['type'] = 'text';
+        let icon = '';
+
+        if (file.type === 'application/pdf') {
+            type = 'pdf';
+            icon = 'pdf';
+        } else if (file.type.includes('word') || file.name.endsWith('.doc') || file.name.endsWith('.docx')) {
+            type = 'word';
+            icon = 'word';
+        } else if (file.type.includes('spreadsheet') || file.type.includes('excel') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
+            type = 'excel';
+            icon = 'excel';
+        } else if (file.type.includes('presentation') || file.type.includes('powerpoint') || file.name.endsWith('.ppt') || file.name.endsWith('.pptx')) {
+            type = 'powerpoint';
+            icon = 'ppt';
+        }
+
+        setArtifactForm({
+            ...artifactForm,
+            title: artifactForm.title || file.name,
+            content: content,
+            type: type,
+            icon: icon
+        });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSaveArtifact = async () => {
@@ -280,30 +335,26 @@ const Artifacts: React.FC = () => {
       collectionId: selectedCollectionId,
       title: artifactForm.title,
       content: artifactForm.content,
+      description: artifactForm.description,
       type: artifactForm.type,
       icon: artifactForm.icon,
       color: artifactForm.color
     };
 
     if (editingArtifactId) {
-      // UPDATE
-      // 1. Atualizar local
       setArtifacts(a => a.map(item => item.id === editingArtifactId ? { ...item, ...artData } as Artifact : item));
       setIsArtifactModalOpen(false);
 
-      // 2. Enviar para Supabase
       try {
           const { error } = await supabase.from('artefatos').update(toSupabaseArt(artData)).eq('id', editingArtifactId);
           if (error) throw error;
           console.log('[SUPABASE] ✅ Artefato atualizado');
       } catch (error) {
           console.error('[SUPABASE] ❌ Erro:', formatError(error));
-          fetchData(); // Revert
+          fetchData(); 
           alert(`Erro ao atualizar artefato: ${formatError(error)}`);
       }
     } else {
-      // CREATE
-      // 1. Atualizar local
       const tempId = `temp-${Date.now()}`;
       const newArtifact = {
         id: tempId,
@@ -315,18 +366,15 @@ const Artifacts: React.FC = () => {
       setSelectedArtifactId(tempId);
       setIsArtifactModalOpen(false);
       
-      // 2. Enviar para Supabase
       try {
           const { data, error } = await supabase.from('artefatos').insert([toSupabaseArt(artData)]).select().single();
           if (error) throw error;
-
-          // 3. Substituir
           setArtifacts(a => a.map(item => item.id === tempId ? toFrontendArt(data) : item));
           setSelectedArtifactId(data.id);
           console.log('[SUPABASE] ✅ Artefato criado');
       } catch (error) {
           console.error('[SUPABASE] ❌ Erro:', formatError(error));
-          setArtifacts(prev => prev.filter(a => a.id !== tempId)); // Revert
+          setArtifacts(prev => prev.filter(a => a.id !== tempId)); 
           if (selectedArtifactId === tempId) setSelectedArtifactId(null);
           alert(`Erro ao criar artefato: ${formatError(error)}`);
       }
@@ -335,15 +383,10 @@ const Artifacts: React.FC = () => {
 
   const handleDeleteArtifact = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    
-    // 1. Guardar para restaurar
     const itemRemoved = artifacts.find(a => a.id === id);
-
-    // 2. Remover local
     if (selectedArtifactId === id) setSelectedArtifactId(null);
     setArtifacts(artifacts.filter(a => a.id !== id));
     
-    // 3. Enviar para Supabase
     try {
         const { error } = await supabase.from('artefatos').delete().eq('id', id);
         if (error) throw error;
@@ -375,17 +418,17 @@ const Artifacts: React.FC = () => {
              <button onClick={() => openCollectionModal()} className="p-1 hover:bg-workspace-surface rounded text-workspace-muted hover:text-workspace-text transition-colors"><Plus className="w-4 h-4" /></button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        <div className="flex-1 overflow-y-auto">
           {collections.map(collection => {
             const Icon = getIconComponent(collection.icon);
             return (
-              <div key={collection.id} onClick={() => { setSelectedCollectionId(collection.id); setSelectedArtifactId(null); }} className={`relative w-full text-left p-3 rounded-lg flex items-center gap-3 transition-all group cursor-pointer ${selectedCollectionId === collection.id ? 'bg-workspace-surface border border-transparent shadow-sm' : 'hover:bg-workspace-surface border border-transparent'}`}>
+              <div key={collection.id} onClick={() => { setSelectedCollectionId(collection.id); setSelectedArtifactId(null); }} className={`relative w-full text-left p-4 flex items-center gap-3 transition-all group cursor-pointer border-b border-workspace-border/50 ${selectedCollectionId === collection.id ? 'bg-workspace-surface' : 'hover:bg-workspace-surface/50'}`}>
                 <div className={`p-2 rounded-md ${selectedCollectionId === collection.id ? 'bg-workspace-accent text-white' : 'bg-workspace-surface text-workspace-muted group-hover:text-workspace-text'}`}><Icon className="w-4 h-4" /></div>
                 <div className="flex-1 min-w-0">
-                  <span className={`block text-sm font-medium truncate ${selectedCollectionId === collection.id ? 'text-workspace-text' : 'text-workspace-text/80'}`}>{collection.name}</span>
-                  <span className="text-[10px] text-workspace-muted truncate block opacity-70">{collection.description || `${artifacts.filter(a => a.collectionId === collection.id).length} itens`}</span>
+                  <span className={`block text-sm font-semibold truncate ${selectedCollectionId === collection.id ? 'text-workspace-text' : 'text-workspace-text/80'}`}>{collection.name}</span>
+                  <span className="text-[10px] text-workspace-muted truncate block opacity-70 uppercase tracking-tighter">{collection.description || `${artifacts.filter(a => a.collectionId === collection.id).length} itens`}</span>
                 </div>
-                {selectedCollectionId === collection.id && <ChevronRight className="w-3 h-3 text-workspace-accent" />}
+                {selectedCollectionId === collection.id && <div className="w-1.5 h-1.5 rounded-full bg-workspace-accent" />}
               </div>
             );
           })}
@@ -397,18 +440,18 @@ const Artifacts: React.FC = () => {
         <div className="w-72 border-r border-workspace-border flex flex-col bg-workspace-surface/30 shrink-0">
            <div className="p-4 h-16 border-b border-workspace-border flex items-center justify-between shrink-0">
              <div className="relative w-full">
-                <Search className="absolute left-2 top-2 w-3.5 h-3.5 text-workspace-muted" />
-                <input type="text" placeholder="Filtrar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-workspace-surface border border-workspace-border rounded-md pl-8 pr-2 py-1.5 text-xs text-workspace-text focus:outline-none focus:border-workspace-accent transition-all" />
+                <Search className="absolute left-2 top-2.5 w-3.5 h-3.5 text-workspace-muted" />
+                <input type="text" placeholder="Filtrar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-workspace-surface border border-workspace-border rounded-md pl-8 pr-2 py-2 text-xs text-workspace-text focus:outline-none focus:border-workspace-accent transition-all" />
              </div>
            </div>
            <div className="flex-1 overflow-y-auto">
-             <div className="px-4 py-3 flex items-center justify-between shrink-0 sticky top-0 z-10">
-                <h3 className="text-xs font-semibold text-workspace-text uppercase tracking-wider truncate max-w-[150px]" title={activeCollection?.name}>{activeCollection?.name}</h3>
-                <button onClick={() => openArtifactModal()} className="text-[10px] flex items-center gap-1 text-workspace-accent hover:underline decoration-1 underline-offset-2"><Plus className="w-3 h-3" /> Novo Item</button>
+             <div className="px-4 py-3 flex items-center justify-between shrink-0 sticky top-0 z-10 bg-workspace-main/90 backdrop-blur-sm border-b border-workspace-border">
+                <h3 className="text-[10px] font-bold text-workspace-text uppercase tracking-widest truncate max-w-[150px]" title={activeCollection?.name}>{activeCollection?.name}</h3>
+                <button onClick={() => openArtifactModal()} className="text-[10px] flex items-center gap-1 text-workspace-accent hover:opacity-80 font-bold"><Plus className="w-3 h-3" /> NOVO</button>
              </div>
-             <div className="px-2 space-y-1 pb-4">
+             <div>
                {filteredArtifacts.length === 0 ? (
-                 <div className="text-center py-8 opacity-50 flex flex-col items-center"><button onClick={() => openArtifactModal()} className="group border border-dashed border-workspace-muted/40 rounded-lg p-6 hover:border-workspace-accent hover:bg-workspace-surface transition-all w-full flex flex-col items-center justify-center gap-2 mb-2"><Plus className="w-6 h-6 text-workspace-muted group-hover:text-workspace-accent" /></button><p className="text-xs text-workspace-muted">Vazio.</p></div>
+                 <div className="text-center py-12 opacity-50 flex flex-col items-center p-6"><Box className="w-10 h-10 mb-4 opacity-10" /><p className="text-xs text-workspace-muted">Nenhum item nesta coleção.</p></div>
                ) : (
                  filteredArtifacts.map(artifact => {
                     const colorData = getArtifactColor(artifact.color);
@@ -416,13 +459,15 @@ const Artifacts: React.FC = () => {
                     const DefaultIcon = artifact.type === 'code' ? FileCode : FileText;
                     const IconToRender = CustomIcon || DefaultIcon;
                     return (
-                   <div key={artifact.id} className={`relative w-full text-left rounded-md border transition-all group ${selectedArtifactId === artifact.id ? `bg-workspace-surface border-transparent shadow-sm` : `bg-transparent hover:bg-workspace-surface hover:border-workspace-border border-transparent`}`}>
-                     <button onClick={() => setSelectedArtifactId(artifact.id)} className="w-full p-3 text-left focus:outline-none">
-                       <div className="flex items-start gap-2 mb-1 pr-6">
-                          <IconToRender className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${artifact.color && artifact.color !== 'default' ? colorData.text : (artifact.type === 'code' ? 'text-blue-500' : 'text-amber-500')}`} />
-                          <span className={`text-sm font-medium line-clamp-1 ${selectedArtifactId === artifact.id ? 'text-workspace-text' : 'text-workspace-text/80'}`}>{artifact.title}</span>
+                   <div key={artifact.id} className={`relative w-full text-left transition-all group border-b border-workspace-border/50 ${selectedArtifactId === artifact.id ? `bg-workspace-surface` : `bg-transparent hover:bg-workspace-surface/30`}`}>
+                     <button onClick={() => setSelectedArtifactId(artifact.id)} className="w-full p-4 text-left focus:outline-none">
+                       <div className="flex items-center gap-2 mb-1.5">
+                          <IconToRender className={`w-3.5 h-3.5 shrink-0 ${artifact.color && artifact.color !== 'default' ? colorData.text : (artifact.type === 'code' ? 'text-blue-500' : 'text-amber-500')}`} />
+                          <span className={`text-sm font-semibold line-clamp-1 ${selectedArtifactId === artifact.id ? 'text-workspace-text' : 'text-workspace-text/80'}`}>{artifact.title}</span>
                        </div>
-                       <p className="text-[10px] text-workspace-muted line-clamp-2 pl-5.5 font-light min-h-[1.25rem]">{artifact.content}</p>
+                       <p className="text-xs text-workspace-muted line-clamp-2 pl-5.5 font-light leading-relaxed">
+                        {['pdf', 'word', 'excel', 'powerpoint'].includes(artifact.type) ? (artifact.description || 'Documento anexo') : artifact.content}
+                       </p>
                      </button>
                    </div>
                  );})
@@ -449,29 +494,55 @@ const Artifacts: React.FC = () => {
                  <div>
                    <h1 className="text-lg font-light text-workspace-text tracking-tight">{activeArtifact.title}</h1>
                    <div className="flex items-center gap-2 text-[10px] text-workspace-muted">
-                      <span>{activeArtifact.type === 'code' ? 'Snippet' : 'Texto'}</span>
+                      <span className="uppercase">{activeArtifact.type}</span>
                       <span className="w-1 h-1 rounded-full bg-workspace-muted/50" />
                       <span>{activeArtifact.createdAt.toLocaleDateString()}</span>
                    </div>
                  </div>
                </div>
                <div className="flex items-center gap-2">
-                 <button onClick={handleCopy} className="flex items-center gap-2 px-3 py-1.5 border border-workspace-border rounded-md hover:bg-workspace-surface transition-colors text-xs text-workspace-muted hover:text-workspace-text">
-                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copiado' : 'Copiar'}
-                 </button>
+                 {['pdf', 'word', 'excel', 'powerpoint'].includes(activeArtifact.type) ? (
+                    <button onClick={handleDownload} className="flex items-center gap-2 px-3 py-1.5 bg-workspace-accent hover:opacity-90 text-white rounded-md transition-colors text-xs font-medium">
+                        <Download className="w-3.5 h-3.5" /> Baixar
+                    </button>
+                 ) : (
+                    <button onClick={handleCopy} className="flex items-center gap-2 px-3 py-1.5 border border-workspace-border rounded-md hover:bg-workspace-surface transition-colors text-xs text-workspace-muted hover:text-workspace-text">
+                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copiado' : 'Copiar'}
+                    </button>
+                 )}
                  <button onClick={() => openArtifactModal(activeArtifact)} className="p-2 hover:bg-workspace-surface hover:text-workspace-text text-workspace-muted rounded-md transition-colors"><Pencil className="w-4 h-4" /></button>
                  <button onClick={(e) => handleDeleteArtifact(activeArtifact.id, e)} className="p-2 hover:bg-red-50 hover:text-red-500 text-workspace-muted rounded-md transition-colors"><Trash2 className="w-4 h-4" /></button>
                </div>
              </div>
              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-               <div className="max-w-3xl mx-auto">
+               <div className="max-w-3xl mx-auto space-y-6">
+                 
+                 {/* Visualização de Documento Anexo */}
+                 {['pdf', 'word', 'excel', 'powerpoint'].includes(activeArtifact.type) && (
+                    <div className="flex items-center gap-4 p-4 bg-workspace-surface border border-workspace-border rounded-lg shadow-sm">
+                        <div className="w-12 h-12 bg-workspace-main rounded-md flex items-center justify-center border border-workspace-border">
+                            {(() => { const Icon = getIconComponent(activeArtifact.icon || 'folder'); return <Icon className="w-6 h-6 text-workspace-accent" />; })()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-semibold text-workspace-text truncate">{activeArtifact.title}</h3>
+                            <p className="text-[10px] text-workspace-muted uppercase tracking-wider font-medium">{activeArtifact.type} - {activeArtifact.createdAt.toLocaleDateString()}</p>
+                        </div>
+                        <button onClick={handleDownload} className="p-2 hover:bg-workspace-accent hover:text-white rounded-md transition-all text-workspace-muted" title="Baixar">
+                            <Download className="w-4 h-4" />
+                        </button>
+                    </div>
+                 )}
+
+                 {/* Conteúdo ou Descrição */}
                  {activeArtifact.type === 'code' ? (
                    <pre className="bg-workspace-surface border border-workspace-border rounded-lg p-6 overflow-x-auto text-sm font-mono text-workspace-text shadow-sm relative group">
                       <div className="absolute top-2 right-2 text-[10px] text-workspace-muted opacity-50 uppercase tracking-wider">Snippet</div>
                       <code>{activeArtifact.content}</code>
                    </pre>
                  ) : (
-                   <div className="prose prose-sm dark:prose-invert max-w-none font-light leading-relaxed text-workspace-text whitespace-pre-wrap">{activeArtifact.content}</div>
+                   <div className="prose prose-sm dark:prose-invert max-w-none font-light leading-relaxed text-workspace-text whitespace-pre-wrap">
+                    {['pdf', 'word', 'excel', 'powerpoint'].includes(activeArtifact.type) ? activeArtifact.description : activeArtifact.content}
+                   </div>
                  )}
                </div>
              </div>
@@ -492,7 +563,7 @@ const Artifacts: React.FC = () => {
               <div><label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Descrição</label><input type="text" value={newColDesc} onChange={(e) => setNewColDesc(e.target.value)} className="w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-2 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors" placeholder="Opcional" /></div>
               <div><label className="block text-xs font-medium text-workspace-muted mb-2 uppercase tracking-wider">Ícone</label><div className="grid grid-cols-6 gap-2 p-2 bg-workspace-main border border-workspace-border rounded-lg max-h-48 overflow-y-auto custom-scrollbar">{Object.keys(ICON_MAP).map((iconKey) => { const IconComponent = ICON_MAP[iconKey]; const isSelected = newColIcon === iconKey; return (<button key={iconKey} onClick={() => setNewColIcon(iconKey)} className={`flex items-center justify-center p-2.5 rounded-md transition-all focus:outline-none ${isSelected ? 'bg-workspace-accent text-white shadow-sm ring-1 ring-workspace-text/20' : 'bg-workspace-surface text-workspace-muted hover:bg-workspace-surface/80 hover:text-workspace-text'}`}><IconComponent className="w-5 h-5 stroke-[1.5]" /></button>);})}</div></div>
             </div>
-            <div className="mt-8 flex justify-end gap-3 shrink-0 pt-4 border-t border-workspace-border"><button onClick={() => setIsCollectionModalOpen(false)} className="px-4 py-2 text-xs font-medium text-workspace-text hover:bg-workspace-main rounded-md transition-colors">CANCELAR</button><button onClick={handleSaveCollection} disabled={!newColName} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"><Save className="w-3 h-3" /> SALVAR</button></div>
+            <div className="mt-8 flex justify-end gap-3 shrink-0 pt-4 border-t border-workspace-border"><button onClick={() => setIsCollectionModalOpen(false)} className="px-4 py-2 text-xs font-medium text-workspace-text hover:bg-workspace-main rounded-md transition-colors">CANCELAR</button><button onClick={handleSaveCollection} disabled={!newColName} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" title="Ctrl+Enter para salvar"><Save className="w-3 h-3" /> SALVAR</button></div>
           </div>
         </div>
       )}
@@ -503,6 +574,9 @@ const Artifacts: React.FC = () => {
           <div className="bg-workspace-surface w-full max-w-lg border border-workspace-border rounded-lg shadow-2xl p-5 relative m-4 max-h-[85vh] flex flex-col">
             <button onClick={() => setIsArtifactModalOpen(false)} className="absolute top-4 right-4 text-workspace-muted hover:text-workspace-text transition-colors"><X className="w-5 h-5" /></button>
             <h2 className="text-lg font-light text-workspace-text mb-4 flex items-center gap-2 shrink-0">{editingArtifactId ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {editingArtifactId ? 'Editar Item' : 'Novo Item'}</h2>
+            
+            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
+
             <div className="space-y-4 overflow-y-auto custom-scrollbar pr-2 flex-1">
               
               {/* Row 1: Title and Type */}
@@ -513,9 +587,10 @@ const Artifacts: React.FC = () => {
                 </div>
                 <div>
                     <label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Tipo</label>
-                    <div className="flex bg-workspace-main border border-workspace-border rounded-md p-1 h-[38px]">
-                        <button onClick={() => setArtifactForm({...artifactForm, type: 'text'})} className={`flex-1 flex items-center justify-center gap-1.5 rounded text-xs font-medium transition-all ${artifactForm.type === 'text' ? 'bg-workspace-surface shadow-sm text-workspace-text' : 'text-workspace-muted hover:text-workspace-text'}`}><FileText className="w-3.5 h-3.5" /> </button>
-                        <button onClick={() => setArtifactForm({...artifactForm, type: 'code'})} className={`flex-1 flex items-center justify-center gap-1.5 rounded text-xs font-medium transition-all ${artifactForm.type === 'code' ? 'bg-workspace-surface shadow-sm text-blue-500' : 'text-workspace-muted hover:text-workspace-text'}`}><FileCode className="w-3.5 h-3.5" /> </button>
+                    <div className="flex bg-workspace-main border border-workspace-border rounded-md p-1 h-[38px] gap-1">
+                        <button onClick={() => setArtifactForm({...artifactForm, type: 'text'})} className={`flex-1 flex items-center justify-center rounded text-xs transition-all ${artifactForm.type === 'text' ? 'bg-workspace-surface shadow-sm text-workspace-text' : 'text-workspace-muted hover:text-workspace-text'}`} title="Texto"><FileText className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => setArtifactForm({...artifactForm, type: 'code'})} className={`flex-1 flex items-center justify-center rounded text-xs transition-all ${artifactForm.type === 'code' ? 'bg-workspace-surface shadow-sm text-blue-500' : 'text-workspace-muted hover:text-workspace-text'}`} title="Código"><FileCode className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => fileInputRef.current?.click()} className={`flex-1 flex items-center justify-center rounded text-xs transition-all ${['pdf', 'word', 'excel', 'powerpoint'].includes(artifactForm.type) ? 'bg-workspace-surface shadow-sm text-emerald-500' : 'text-workspace-muted hover:text-workspace-text'}`} title="Subir Arquivo (PDF, Word, etc)"><FileUp className="w-3.5 h-3.5" /></button>
                     </div>
                 </div>
               </div>
@@ -545,20 +620,39 @@ const Artifacts: React.FC = () => {
                  </div>
               </div>
 
-              {/* Row 3: Content */}
+              {/* Row 3: File Attachment Indicator (Only if file) */}
+              {['pdf', 'word', 'excel', 'powerpoint'].includes(artifactForm.type) && (
+                <div className="animate-fade-in">
+                    <label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Arquivo Selecionado</label>
+                    <div className="w-full bg-workspace-main border border-workspace-border border-dashed rounded-md p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            {(() => { const Icon = getIconComponent(artifactForm.icon || 'folder'); return <Icon className="w-6 h-6 text-workspace-accent" />; })()}
+                            <span className="text-xs text-workspace-text truncate max-w-[200px]">{artifactForm.title}</span>
+                        </div>
+                        <button onClick={() => setArtifactForm({...artifactForm, type: 'text', content: '', icon: ''})} className="p-1 hover:text-red-500 transition-colors"><X className="w-4 h-4" /></button>
+                    </div>
+                </div>
+              )}
+
+              {/* Row 4: Content / Description */}
               <div>
-                <label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">Conteúdo</label>
+                <label className="block text-xs font-medium text-workspace-muted mb-1.5 uppercase tracking-wider">
+                  {['pdf', 'word', 'excel', 'powerpoint'].includes(artifactForm.type) ? 'Notas / Descrição' : 'Conteúdo'}
+                </label>
                 <textarea 
-                    value={artifactForm.content} 
-                    onChange={(e) => setArtifactForm({...artifactForm, content: e.target.value})} 
+                    value={['pdf', 'word', 'excel', 'powerpoint'].includes(artifactForm.type) ? artifactForm.description : artifactForm.content} 
+                    onChange={(e) => setArtifactForm({
+                        ...artifactForm, 
+                        [['pdf', 'word', 'excel', 'powerpoint'].includes(artifactForm.type) ? 'description' : 'content']: e.target.value
+                    })} 
                     className={`w-full bg-workspace-main border border-workspace-border rounded-md px-3 py-3 text-sm text-workspace-text focus:outline-none focus:border-workspace-accent transition-colors min-h-[150px] resize-y font-light leading-relaxed ${artifactForm.type === 'code' ? 'font-mono text-xs' : ''}`} 
-                    placeholder={artifactForm.type === 'code' ? '// Código aqui...' : 'Texto aqui...'} 
+                    placeholder={artifactForm.type === 'code' ? '// Código aqui...' : (['pdf', 'word', 'excel', 'powerpoint'].includes(artifactForm.type) ? 'Adicione uma breve descrição ou notas sobre este documento...' : 'Texto aqui...')} 
                 />
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3 shrink-0 pt-4 border-t border-workspace-border">
                 <button onClick={() => setIsArtifactModalOpen(false)} className="px-4 py-2 text-xs font-medium text-workspace-text hover:bg-workspace-main rounded-md transition-colors">CANCELAR</button>
-                <button onClick={handleSaveArtifact} disabled={!artifactForm.title} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"><Save className="w-3 h-3" /> SALVAR</button>
+                <button onClick={handleSaveArtifact} disabled={!artifactForm.title} className="px-6 py-2 bg-workspace-accent hover:opacity-90 text-white text-xs font-medium tracking-wide rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" title="Ctrl+Enter para salvar"><Save className="w-3 h-3" /> SALVAR</button>
             </div>
           </div>
         </div>
