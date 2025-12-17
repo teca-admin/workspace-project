@@ -3,8 +3,10 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Home from './components/Home';
 import Tools from './components/Tools';
+import Notes from './components/Notes';
+import Artifacts from './components/Artifacts';
 import { View } from './types';
-import { Briefcase, CheckSquare, Library } from 'lucide-react';
+import { Briefcase, CheckSquare } from 'lucide-react';
 
 const PlaceholderView: React.FC<{ title: string; subtitle: string; icon: any }> = ({ title, subtitle, icon: Icon }) => (
   <div className="flex flex-col items-center justify-center h-full text-workspace-muted animate-fade-in">
@@ -39,12 +41,14 @@ const App: React.FC = () => {
         return <Home setCurrentView={setCurrentView} />;
       case View.TOOLS:
         return <Tools />;
+      case View.NOTES:
+        return <Notes />;
+      case View.ARTIFACTS:
+        return <Artifacts />;
       case View.PROJECTS:
         return <PlaceholderView title="Projetos" subtitle="Gerenciamento de projetos em breve" icon={Briefcase} />;
       case View.DEMANDS:
         return <PlaceholderView title="Demandas" subtitle="Lista de tarefas não disponível" icon={CheckSquare} />;
-      case View.LIBRARY:
-        return <PlaceholderView title="Biblioteca" subtitle="Repositório de arquivos vazio" icon={Library} />;
       case View.DASHBOARD:
         return <Dashboard />;
       default:
@@ -69,7 +73,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2 text-workspace-muted text-xs tracking-widest font-medium uppercase">
              <span>Workspace</span>
              <span className="text-workspace-accent">/</span>
-             <span className="text-workspace-text/60">{currentView}</span>
+             <span className="text-workspace-text/60">{currentView === 'ARTIFACTS' ? 'ARTEFATOS' : currentView}</span>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1 bg-workspace-surface border border-workspace-border rounded-full shadow-sm">

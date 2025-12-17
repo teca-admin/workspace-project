@@ -5,26 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Workspace Minimalista</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
       :root {
-        /* Light Mode Palette */
+        /* Light Mode Palette (Default) */
         --bg-main: #F3F4F6;       /* Gray 100 */
         --bg-surface: #FFFFFF;    /* White */
         --border-color: #E5E7EB;  /* Gray 200 */
-        --accent: #30403E;        /* The brand dark green (keeps contrast) */
-        --accent-hover: #E2E8F0;  /* Gray 200 for hovers */
+        --accent: #30403E;        /* Dark Green */
+        --accent-hover: #E2E8F0;  /* Gray 200 */
         --text-main: #111827;     /* Gray 900 */
         --text-muted: #6B7280;    /* Gray 500 */
         --scrollbar-track: #F3F4F6;
         --scrollbar-thumb: #D1D5DB;
       }
 
+      /* Dark Mode Override using class selector for higher specificity */
       .dark {
-        /* Dark Mode Palette (Original) */
         --bg-main: #000208;
         --bg-surface: #0a0c10;
-        --border-color: rgba(48, 64, 62, 0.4);
+        /* Using solid dark gray instead of transparent white to avoid 'white border' look */
+        --border-color: #1F2937; 
         --accent: #30403E;
         --accent-hover: rgba(48, 64, 62, 0.2);
         --text-main: #e5e7eb;
@@ -34,7 +35,7 @@
       }
 
       html {
-        font-size: 80%; /* Zoom out de 20% (100% - 20% = 80%) */
+        font-size: 80%; /* Zoom out de 20% */
       }
 
       html, body {
@@ -46,6 +47,13 @@
         color: var(--text-main);
         overflow: hidden;
         transition: background-color 0.3s ease, color 0.3s ease;
+      }
+
+      /* Global Focus Reset to remove white outlines on click */
+      *, *:focus, *:active {
+        outline: none !important;
+        -webkit-tap-highlight-color: transparent;
+        box-shadow: none !important; /* Prevents focus rings implemented via box-shadow */
       }
 
       /* Custom Scrollbar using vars */
@@ -102,7 +110,8 @@
     "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
     "recharts": "https://esm.sh/recharts@^3.5.1",
     "vite": "https://esm.sh/vite@^7.2.7",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.87.3"
   }
 }
 </script>

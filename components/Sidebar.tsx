@@ -10,7 +10,8 @@ import {
   ChevronRight, 
   Hexagon,
   Moon,
-  Sun
+  Sun,
+  StickyNote
 } from 'lucide-react';
 import { View, NavItem } from '../types';
 
@@ -23,13 +24,14 @@ interface SidebarProps {
   toggleTheme: () => void;
 }
 
-// Order: HOME, FERRAMENTA, PROJETOS, DEMANDAS, BIBLIOTECA, PAINEL
+// Order updated to include NOTES and ARTEFATOS
 const navItems: NavItem[] = [
   { id: View.HOME, label: 'HOME', icon: Home },
   { id: View.TOOLS, label: 'FERRAMENTA', icon: Wrench },
+  { id: View.NOTES, label: 'NOTAS', icon: StickyNote },
+  { id: View.ARTIFACTS, label: 'ARTEFATOS', icon: Library },
   { id: View.PROJECTS, label: 'PROJETOS', icon: Briefcase },
   { id: View.DEMANDS, label: 'DEMANDAS', icon: CheckSquare },
-  { id: View.LIBRARY, label: 'BIBLIOTECA', icon: Library },
   { id: View.DASHBOARD, label: 'PAINEL', icon: LayoutDashboard },
 ];
 
@@ -51,7 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Header / Logo Area */}
       <div className="flex items-center justify-between px-6 h-20 border-b border-workspace-border">
         <div className={`flex items-center gap-3 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}>
-          <div className="flex items-center justify-center w-8 h-8 bg-workspace-accent/10 rounded-md border border-workspace-accent/20">
+          <div className="flex items-center justify-center w-8 h-8 bg-workspace-accent/10 rounded-md">
             <Hexagon className="w-4 h-4 text-workspace-text stroke-[1.5]" />
           </div>
           <span className="font-medium text-sm tracking-[0.2em] text-workspace-text whitespace-nowrap">WORKSPACE</span>
@@ -72,7 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               key={item.id}
               onClick={() => setCurrentView(item.id)}
               className={`
-                flex items-center w-full px-3 py-2.5 rounded-md transition-all duration-200 group relative
+                flex items-center w-full px-3 py-2.5 rounded-md transition-all duration-200 group relative focus:outline-none
                 ${isActive 
                   ? 'bg-workspace-accent text-white shadow-sm' 
                   : 'text-workspace-muted hover:bg-workspace-accent-hover hover:text-workspace-text'
@@ -113,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={toggleTheme}
           className={`
-            flex items-center justify-center w-full p-2 rounded-md text-workspace-muted hover:bg-workspace-accent-hover hover:text-workspace-text transition-colors
+            flex items-center justify-center w-full p-2 rounded-md text-workspace-muted hover:bg-workspace-accent-hover hover:text-workspace-text transition-colors focus:outline-none
             ${!isOpen && 'aspect-square'}
           `}
           title={isDarkMode ? "Mudar para modo claro" : "Mudar para modo escuro"}
@@ -134,7 +136,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Sidebar Toggle */}
         <button
           onClick={toggleSidebar}
-          className="flex items-center justify-center w-full p-2 rounded-md text-workspace-muted hover:bg-workspace-accent-hover hover:text-workspace-text transition-colors"
+          className="flex items-center justify-center w-full p-2 rounded-md text-workspace-muted hover:bg-workspace-accent-hover hover:text-workspace-text transition-colors focus:outline-none"
         >
           {isOpen ? <ChevronLeft className="w-4 h-4 stroke-[1.5]" /> : <ChevronRight className="w-4 h-4 stroke-[1.5]" />}
         </button>

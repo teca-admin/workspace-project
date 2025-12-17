@@ -1,11 +1,12 @@
 import React from 'react';
 
 export enum View {
-  HOME = 'HOME',         // HOME (Nova)
+  HOME = 'HOME',         // HOME
   TOOLS = 'TOOLS',       // FERRAMENTA
   PROJECTS = 'PROJECTS', // PROJETOS
+  NOTES = 'NOTES',       // NOTAS
   DEMANDS = 'DEMANDS',   // DEMANDAS
-  LIBRARY = 'LIBRARY',   // BIBLIOTECA
+  ARTIFACTS = 'ARTIFACTS', // ARTEFATOS (Antiga Library)
   DASHBOARD = 'DASHBOARD' // PAINEL
 }
 
@@ -22,9 +23,36 @@ export interface ChartDataPoint {
 
 export interface Tool {
   id: string;
-  title: string;
-  description: string;
+  titulo: string;
+  descricao: string;
   url: string;
+  icone?: string;
+  categoria?: string;
+}
+
+export interface Note {
+  id: string;
+  titulo: string;
+  conteudo: string;
+  criado_em: Date;
+  atualizado_em: Date;
+}
+
+// Interfaces para os Artefatos (Conceito de Mago/Arsenal)
+export interface ArtifactCollection {
+  id: string;
+  name: string; // Ex: "Prompts", "Necromancia", "Frontend"
+  icon: string; // Identificador do ícone
+  description?: string;
+}
+
+export interface Artifact {
+  id: string;
+  collectionId: string;
+  title: string;
+  content: string;
+  type: 'code' | 'text' | 'spell';
+  createdAt: Date;
   icon?: string;
-  category?: string;
+  color?: string; // 'blue' | 'green' | 'amber' | 'red' | 'purple' | 'gray' etc
 }
