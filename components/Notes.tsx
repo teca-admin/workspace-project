@@ -370,7 +370,7 @@ const Notes: React.FC = () => {
              </div>
           ) : (
             filteredNotes.map(note => (
-              <div key={note.id} className={`group relative border-b border-workspace-border transition-all duration-200 ${activeNoteId === note.id ? 'bg-workspace-surface' : 'bg-transparent hover:bg-workspace-surface/50'}`}>
+              <div key={note.id} className={`group relative border-b border-workspace-border transition-all duration-200 border-l-2 ${activeNoteId === note.id ? 'bg-workspace-surface border-l-workspace-accent' : 'bg-transparent border-l-transparent hover:bg-workspace-surface/50'}`}>
                 <div onClick={() => setActiveNoteId(note.id)} className="p-4 cursor-pointer w-full select-none">
                     <div className="flex justify-between items-start mb-1.5">
                         <h3 className={`text-sm font-semibold truncate pr-8 ${activeNoteId === note.id ? 'text-workspace-text' : 'text-workspace-text/90'}`}>{note.title || 'Sem Título'}</h3>
@@ -450,7 +450,7 @@ const Notes: React.FC = () => {
             <input type="text" value={activeNote.title} onChange={(e) => updateActiveNote({ title: e.target.value })} onKeyDown={handleKeyDown} className="w-full text-3xl font-light text-workspace-text bg-transparent border-none outline-none placeholder-workspace-muted/40" placeholder="Título da Nota" />
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar px-8 pb-12 cursor-text" onClick={() => { if (document.activeElement !== contentEditableRef.current && !showLinkInput && !selectedElement) contentEditableRef.current?.focus(); }}>
-            <div ref={contentEditableRef} className={`w-full h-full outline-none text-workspace-text text-base leading-relaxed font-light prose prose-sm dark:prose-invert max-w-none ${selectedElement?.tagName === 'IMG' ? 'selection:bg-transparent' : ''}`} contentEditable onInput={(e) => updateActiveNote({ content: e.currentTarget.innerHTML })} onKeyDown={handleKeyDown} onKeyUp={saveSelection} onMouseUp={saveSelection} onClick={handleEditorClick} suppressContentEditableWarning={true} style={{ minHeight: '50vh' }} data-placeholder="Comece a escrever aqui..." />
+            <div ref={contentEditableRef} className={`w-full h-full outline-none text-workspace-text text-base leading-relaxed font-light prose prose-sm dark:prose-invert max-w-none border-l-2 border-transparent pl-6 transition-colors focus:border-l-workspace-accent ${selectedElement?.tagName === 'IMG' ? 'selection:bg-transparent' : ''}`} contentEditable onInput={(e) => updateActiveNote({ content: e.currentTarget.innerHTML })} onKeyDown={handleKeyDown} onKeyUp={saveSelection} onMouseUp={saveSelection} onClick={handleEditorClick} suppressContentEditableWarning={true} style={{ minHeight: '50vh' }} data-placeholder="Comece a escrever aqui..." />
           </div>
           <div className="px-6 py-2 border-t border-workspace-border text-[10px] text-workspace-muted flex justify-between items-center bg-workspace-main">
               <div className="flex gap-4">

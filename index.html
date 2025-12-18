@@ -10,11 +10,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
       :root {
-        /* Light Mode Palette (Clean & Airy) */
+        /* Light Mode Palette */
         --bg-main: #ffffff;       
-        --bg-surface: #f4f4f5;    /* Zinc 100 */
-        --border-color: #e4e4e7;  /* Zinc 200 */
-        --accent: #18181b;        /* Zinc 900 (Black for high contrast actions) */
+        --bg-surface: #f4f4f5;    
+        --border-color: #e4e4e7;  
+        --accent: #18181b;        
         --accent-hover: #f4f4f5;  
         --text-main: #09090b;     
         --text-muted: #71717a;    
@@ -22,24 +22,21 @@
         --scrollbar-thumb: #e4e4e7;
       }
 
-      /* Dark Mode Override (Deep & Minimalist) */
+      /* Dark Mode Override */
       .dark {
-        --bg-main: #09090b;       /* Zinc 950 - Deep black */
-        --bg-surface: #121214;    /* Slightly elevated surface */
-        
-        /* BORDA CORRIGIDA: Removido o branco com opacidade, usando cinza ultra-escuro sólido */
+        --bg-main: #09090b;       
+        --bg-surface: #121214;    
         --border-color: #1a1a1e;  
-        
-        --accent: #27272a;        /* Zinc 800 - Subtle active state */
+        --accent: #27272a;        
         --accent-hover: rgba(255, 255, 255, 0.01);
-        --text-main: #fafafa;     /* Zinc 50 */
-        --text-muted: #a1a1aa;    /* Zinc 400 */
+        --text-main: #fafafa;     
+        --text-muted: #a1a1aa;    
         --scrollbar-track: #09090b;
         --scrollbar-thumb: #27272a;
       }
 
       html {
-        font-size: 75%; /* Ajustado para 75% */
+        font-size: 75%; 
       }
 
       html, body {
@@ -50,7 +47,6 @@
         background-color: var(--bg-main);
         color: var(--text-main);
         overflow: hidden;
-        transition: background-color 0.3s ease, color 0.3s ease;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
@@ -64,18 +60,15 @@
 
       /* Minimalist Scrollbar */
       ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 4px;
+        height: 4px;
       }
       ::-webkit-scrollbar-track {
         background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
         background: var(--scrollbar-thumb); 
-        border-radius: 3px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: var(--text-muted); 
+        border-radius: 2px;
       }
     </style>
     <script>
@@ -95,12 +88,12 @@
               }
             },
             animation: {
-              'fade-in': 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'fade-in-quick': 'fadeInQuick 0.15s ease-out forwards',
             },
             keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0', transform: 'translateY(5px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
+              fadeInQuick: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
               }
             }
           }

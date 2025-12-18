@@ -9,7 +9,7 @@ import { View } from './types';
 import { Briefcase, CheckSquare } from 'lucide-react';
 
 const PlaceholderView: React.FC<{ title: string; subtitle: string; icon: any }> = ({ title, subtitle, icon: Icon }) => (
-  <div className="flex flex-col items-center justify-center h-full text-workspace-muted animate-fade-in">
+  <div className="flex flex-col items-center justify-center h-full text-workspace-muted animate-fade-in-quick">
     <div className="p-4 border border-workspace-border rounded-lg mb-6 bg-workspace-surface">
       <Icon size={32} className="text-workspace-accent stroke-[1]" />
     </div>
@@ -57,7 +57,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-workspace-main text-workspace-text selection:bg-workspace-accent selection:text-white transition-colors duration-300">
+    <div className="flex h-screen w-full overflow-hidden bg-workspace-main text-workspace-text selection:bg-workspace-accent selection:text-white">
       <Sidebar 
         isOpen={sidebarOpen} 
         toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
@@ -67,24 +67,24 @@ const App: React.FC = () => {
         toggleTheme={toggleTheme}
       />
       
-      <main className="flex-1 h-full overflow-hidden relative flex flex-col bg-workspace-main transition-colors duration-300">
+      <main className="flex-1 h-full overflow-hidden relative flex flex-col bg-workspace-main">
         {/* Top Header Strip - Ultra Minimal */}
-        <header className="h-14 border-b border-workspace-border flex items-center justify-between px-8 bg-workspace-main z-10 shrink-0 transition-colors duration-300">
+        <header className="h-14 border-b border-workspace-border flex items-center justify-between px-8 bg-workspace-main z-10 shrink-0">
           <div className="flex items-center gap-2 text-workspace-muted text-xs tracking-widest font-medium uppercase">
              <span>Workspace</span>
              <span className="text-workspace-accent">/</span>
              <span className="text-workspace-text/60">{currentView === 'ARTIFACTS' ? 'ARTEFATOS' : currentView}</span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1 bg-workspace-surface border border-workspace-border rounded-full shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                <span className="text-[10px] text-workspace-muted font-medium tracking-wider">ONLINE</span>
+            <div className="flex items-center gap-2 px-3 py-1 bg-workspace-surface border border-workspace-border rounded-full">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                <span className="text-[10px] text-workspace-muted font-medium tracking-wider uppercase">Online</span>
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto scroll-smooth p-0 bg-workspace-main transition-colors duration-300">
+        <div className="flex-1 overflow-hidden bg-workspace-main">
           {renderContent()}
         </div>
       </main>
