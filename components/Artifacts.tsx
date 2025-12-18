@@ -221,7 +221,7 @@ const Artifacts: React.FC = () => {
                   className={`w-full p-3 text-left transition-colors flex flex-col gap-1 border-l-2 ${selectedArtifactId === art.id ? 'bg-workspace-surface border-workspace-accent' : 'border-transparent hover:bg-workspace-surface/40'}`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1 rounded bg-workspace-surface border border-workspace-border/50 shrink-0">
+                    <div className="p-1 rounded bg-workspace-surface border border-workspace-border shrink-0 shadow-none">
                       <Icon className={`w-3 h-3 ${color}`} />
                     </div>
                     <span className="text-[11px] font-bold truncate leading-none flex-1">{art.title}</span>
@@ -242,7 +242,7 @@ const Artifacts: React.FC = () => {
           <>
             <div className="h-12 border-b border-workspace-border flex items-center justify-between px-6 shrink-0 z-10">
               <div className="flex items-center gap-3 min-w-0 overflow-hidden">
-                <div className="p-1.5 bg-workspace-main border border-workspace-border/50 rounded shrink-0 shadow-sm">
+                <div className="p-1.5 bg-workspace-surface border border-workspace-border rounded shrink-0 shadow-none">
                   {(() => { 
                     const Icon = getIcon(activeArtifact.icon || 'file'); 
                     const colorClass = COLOR_OPTIONS.find(c => c.id === activeArtifact.color)?.text || 'text-workspace-accent';
@@ -282,8 +282,8 @@ const Artifacts: React.FC = () => {
               <div className="max-w-2xl space-y-4">
                 {['pdf', 'word', 'excel', 'powerpoint'].includes(activeArtifact.type) ? (
                   <div className="flex flex-col gap-6 animate-fade-in-quick">
-                    <div className="flex items-center gap-3 p-4 bg-workspace-surface border border-workspace-border border-l-4 border-l-workspace-accent rounded shadow-sm">
-                      <div className="w-10 h-10 bg-workspace-main rounded border border-workspace-border/50 flex items-center justify-center shrink-0 shadow-sm">
+                    <div className="flex items-center gap-3 p-4 bg-workspace-surface border border-workspace-border border-l-4 border-l-workspace-accent rounded shadow-none">
+                      <div className="w-10 h-10 bg-workspace-surface border border-workspace-border rounded flex items-center justify-center shrink-0 shadow-none">
                         {(() => { 
                           const Icon = getIcon(activeArtifact.icon || 'file'); 
                           const colorClass = COLOR_OPTIONS.find(c => c.id === activeArtifact.color)?.text || 'text-workspace-accent';
@@ -347,7 +347,61 @@ const Artifacts: React.FC = () => {
         </div>
       )}
 
-      {/* Resto do componente omitido para brevidade, mantendo funcionalidade intacta */}
+      {isArtifactModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-workspace-surface w-full max-w-md border border-workspace-border rounded shadow-2xl p-5 flex flex-col max-h-[85vh]">
+            <h2 className="text-[9px] font-black mb-4 uppercase tracking-widest">Artefato</h2>
+            <div className="space-y-3 overflow-y-auto flex-1 pr-1 custom-scrollbar">
+              <input 
+                type="text" 
+                value={artifactForm.title} 
+                onChange={(e) => setArtifactForm({...artifactForm, title: e.target.value})} 
+                className="w-full bg-workspace-main border border-workspace-border rounded px-2 py-2 text-[10px] focus:outline-none focus:border-workspace-accent" 
+                placeholder="Título"
+                autoFocus
+              />
+              <div className="flex gap-1.5">
+                <button onClick={() => setArtifactForm({...artifactForm, type: 'text'})} className={`flex-1 py-1.5 rounded border border-workspace-border text-[8px] font-black ${artifactForm.type === 'text' ? 'bg-workspace-accent text-white border-workspace-accent' : 'bg-workspace-main text-workspace-muted'}`}>TEXTO</button>
+                <button onClick={() => setArtifactForm({...artifactForm, type: 'code'})} className={`flex-1 py-1.5 rounded border border-workspace-border text-[8px] font-black ${artifactForm.type === 'code' ? 'bg-workspace-accent text-white border-workspace-accent' : 'bg-workspace-main text-workspace-muted'}`}>CÓDIGO</button>
+                <button onClick={() => fileInputRef.current?.click()} className="flex-1 py-1.5 rounded border border-workspace-border bg-workspace-main text-[8px] font-black flex items-center justify-center gap-1 hover:bg-workspace-surface"><Upload className="w-2.5 h-2.5" /> ARQUIVO</button>
+              </div>
+              <textarea 
+                value={artifactForm.content} 
+                onChange={(e) => setArtifactForm({...artifactForm, content: e.target.value})} 
+                className="w-full bg-workspace-main border border-workspace-border rounded px-2 py-2 text-[10px] min-h-[150px] resize-none focus:outline-none focus:border-workspace-accent" 
+                placeholder="Insira o texto ou arraste um arquivo..."
+              />
+            </div>
+            <input type="file" ref={fileInputRef} onChange={(e) => { 
+                const f = e.target.files?.[0]; 
+                if(f) { 
+                    const r = new FileReader(); 
+                    r.onload = (ev) => {
+                        const base64 = ev.target?.result as string;
+                        let type: Artifact['type'] = 'text';
+                        if (f.type.includes('pdf')) type = 'pdf';
+                        else if (f.type.includes('word')) type = 'word';
+                        else if (f.type.includes('excel')) type = 'excel';
+                        else if (f.type.includes('powerpoint')) type = 'powerpoint';
+                        
+                        setArtifactForm({
+                            ...artifactForm, 
+                            title: f.name, 
+                            content: base64, 
+                            type: type,
+                            icon: type === 'text' ? 'file' : type
+                        });
+                    };
+                    r.readAsDataURL(f); 
+                } 
+            }} className="hidden" />
+            <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-workspace-border shrink-0">
+              <button onClick={() => setIsArtifactModalOpen(false)} className="text-[8px] font-bold text-workspace-muted uppercase px-2 py-1">Cancelar</button>
+              <button onClick={saveArtifact} className="px-5 py-1.5 bg-workspace-accent text-white text-[8px] font-black rounded uppercase">Salvar Artefato</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
