@@ -48,6 +48,7 @@ export interface ArtifactCollection {
   name: string;         // Frontend: name, DB: nome
   icon: string;         // Frontend: icon, DB: icone
   description?: string; // Frontend: description, DB: descricao
+  updatedAt?: Date;
 }
 
 export interface Artifact {
@@ -58,6 +59,7 @@ export interface Artifact {
   description?: string; // Frontend: description, DB: descricao
   type: 'code' | 'text' | 'spell' | 'pdf' | 'word' | 'excel' | 'powerpoint'; // Frontend: type, DB: tipo
   createdAt: Date;      // Frontend: createdAt, DB: criado_em
+  updatedAt?: Date;     // Frontend: updatedAt, DB: atualizado_em
   icon?: string;        // Frontend: icon, DB: icone
   color?: string;       // Frontend: color, DB: cor
 }
