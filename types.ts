@@ -47,6 +47,7 @@ export interface ArtifactCollection {
   id: string;
   name: string;         // Frontend: name, DB: nome
   icon: string;         // Frontend: icon, DB: icone
+  color?: string;       // Frontend: color, DB: cor
   description?: string; // Frontend: description, DB: descricao
   updatedAt?: Date;
 }
